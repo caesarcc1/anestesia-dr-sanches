@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AnesthesiaRecord, ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode, ANESTHESIA_DRUGS, POST_MEDS } from '@/types';
 import { cleanAndDeduplicateSpeech } from '@/lib/voice-parser';
-import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight, Type, Edit3, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Check, RefreshCw, X, AlertCircle, AlertTriangle, ArrowRight, Type, Edit3, CheckCircle2, Waves } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface VoiceRecorderModalProps {
@@ -55,52 +55,51 @@ export function VoiceRecorderModal({
 
   const recognitionRef = useRef<any>(null);
   const isRecordingRef = useRef(false);
-  const finalTranscriptRef = useRef('');
+  const accumulatedTranscriptRef = useRef('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const liveTranscriptRef = useRef('');
 
   const nextDefaultOrder = existingRecords.length + 1;
 
   // 10 Exemplos reais e práticos para testes com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
     {
-      title: 'Bento (Shih Tzu c/ Nodulectomia / Procedimento 3)',
+      title: '1. Bento (Shih Tzu c/ Nodulectomia / Proc. 3)',
       text: 'Animal 1, cão, macho, Shih Tzu, Bento, 6kg, 7 anos, propofol e isoflurano, pós melox e agemoxi, procedimento 3 nodulectomia. Sem intercorrências.',
     },
     {
-      title: 'Luna (Gata Persa Chipada c/ Hipotermia)',
+      title: '2. Luna (Gata Persa Chipada c/ Hipotermia)',
       text: 'Animal 2, felino, fêmea, persa, Luna, 3.5kg, 3 anos, microchip 982000543210, propofol e quetamina, feito dipirona no pós, OSH. Intercorrência: Hipotermia leve revertida com colchão térmico.',
     },
     {
-      title: 'Zeus (Rottweiler Pesado c/ Xilazina e Tramal)',
+      title: '3. Zeus (Rottweiler Pesado c/ Xilazina e Tramal)',
       text: 'Animal 3, canino, macho, Rottweiler, Zeus, 42kg, 4 anos, xila e tramal e propo, agemoxi e melox de pós, castração de macho. Sem intercorrências.',
     },
     {
-      title: 'Mimi (Gata SRD Filhote c/ Vitamina K e Transamin)',
+      title: '4. Mimi (Gata SRD Filhote c/ Vitamina K e Transamin)',
       text: 'Animal 4, gato, fêmea, SRD, Mimi, 1.8kg, 8 meses, quetamina e transamin e vit k, pós meloxicam e dipirona, procedimento 2. Obs: Sangramento capilar discreto estancado.',
     },
     {
-      title: 'Spike (Pinscher Idoso c/ Apneia Transitória)',
+      title: '5. Spike (Pinscher Idoso c/ Apneia Transitória)',
       text: 'Animal 5, cão, macho, Pinscher, Spike, 3kg, 10 anos, microchip 982000887766, propofol e iso, dipi de pós, orqui. Intercorrência: Apneia transitória após indução.',
     },
     {
-      title: 'Hugo (Gato Siamês c/ abreviações e bradicardia)',
+      title: '6. Hugo (Gato Siamês c/ abreviações e bradicardia)',
       text: 'Animal 2, gato, macho, siamês, Hugo, 4 anos, 2kg, propofol e iso, melox e dipi de pós, orqui. Intercorrência: Pequena bradicardia no início.',
     },
     {
-      title: 'Miguel (Galgo Italiano c/ xilazina e tramadol)',
+      title: '7. Miguel (Galgo Italiano c/ xilazina e tramadol)',
       text: 'Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, feito agemoxi no pós, procedimento 2. Sem intercorrências.',
     },
     {
-      title: 'Princesa (Gata Fêmea SRD c/ dipirona)',
+      title: '8. Princesa (Gata Fêmea SRD c/ dipirona)',
       text: 'Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona de pós, procedimento 1. Sem intercorrências',
     },
     {
-      title: 'Bob (Poodle Macho c/ propofol e queta)',
+      title: '9. Bob (Poodle Macho c/ propofol e queta)',
       text: 'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
     },
     {
-      title: 'Mel (Cadela Pitbull Chipada c/ OSH)',
+      title: '10. Mel (Cadela Pitbull Chipada c/ OSH)',
       text: 'Paciente 3 cadela Pitbull Mel 18kg 3 anos Microchip 982000456 Propofol Isoflurano Meloxicam Dipirona OSH',
     },
   ];
@@ -120,8 +119,7 @@ export function VoiceRecorderModal({
     setRecordingTime(0);
     setIsProcessing(false);
     setLiveTranscript('');
-    liveTranscriptRef.current = '';
-    finalTranscriptRef.current = '';
+    accumulatedTranscriptRef.current = '';
     setManualInputText('');
     setShowTextInput(false);
     setParsedResult(null);
@@ -134,7 +132,7 @@ export function VoiceRecorderModal({
   // Preenche todos os campos editáveis a partir do resultado retornado
   const populateEditableFields = (data: ParsedVoiceResult) => {
     setParsedResult(data);
-    setRawEditableText(data.raw_transcription || liveTranscriptRef.current || '');
+    setRawEditableText(data.raw_transcription || accumulatedTranscriptRef.current || '');
     setPatientName(data.patient_name || 'Paciente');
     setBreed(data.breed || 'SRD');
     setSpecies(data.species || 'CAN');
@@ -176,8 +174,7 @@ export function VoiceRecorderModal({
   const startRecording = async () => {
     setErrorMsg(null);
     setLiveTranscript('');
-    liveTranscriptRef.current = '';
-    finalTranscriptRef.current = '';
+    accumulatedTranscriptRef.current = '';
     setParsedResult(null);
 
     const SpeechRecognition = typeof window !== 'undefined'
@@ -193,8 +190,9 @@ export function VoiceRecorderModal({
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'pt-BR';
+      // Modo Gemini/WhatsApp: sem interimResults para não repetir palavras na tela!
       recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (event: any) => {
@@ -204,8 +202,8 @@ export function VoiceRecorderModal({
         }
         const cleaned = cleanAndDeduplicateSpeech(full);
         if (cleaned) {
+          accumulatedTranscriptRef.current = cleaned;
           setLiveTranscript(cleaned);
-          liveTranscriptRef.current = cleaned;
         }
       };
 
@@ -256,12 +254,18 @@ export function VoiceRecorderModal({
       recognitionRef.current = null;
     }
 
-    const textToParse = cleanAndDeduplicateSpeech(liveTranscriptRef.current.trim());
-    if (textToParse && textToParse.length > 2) {
-      handleProcessText(textToParse);
-    } else {
-      setErrorMsg('Nenhuma fala detectada. Fale mais perto do microfone ou use os exemplos rápidos.');
-    }
+    setIsProcessing(true);
+
+    // Aguarda 350ms para que o último buffer de fala do navegador finalize
+    setTimeout(() => {
+      const textToParse = cleanAndDeduplicateSpeech(accumulatedTranscriptRef.current.trim());
+      if (textToParse && textToParse.length > 2) {
+        handleProcessText(textToParse);
+      } else {
+        setIsProcessing(false);
+        setErrorMsg('Nenhuma fala foi capturada. Fale mais perto do microfone ou use os exemplos rápidos.');
+      }
+    }, 350);
   };
 
   const handleProcessText = async (textToProcess: string) => {
@@ -356,11 +360,11 @@ export function VoiceRecorderModal({
                   Cadastro por Comando de Voz
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  v1.7.0
+                  v1.9.0
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Fale os dados do animal ou use os botões rápidos
+                Grave os dados do animal e toque em Concluir
               </p>
             </div>
           </div>
@@ -377,66 +381,78 @@ export function VoiceRecorderModal({
           
           {/* Main Recording Station */}
           {!parsedResult && (
-            <div className="flex flex-col items-center justify-center py-4 text-center space-y-4">
-              {/* Giant Recording Button */}
-              <div className="relative">
-                {isRecording && (
-                  <div className="absolute -inset-3 rounded-full bg-rose-500/30 animate-ping pointer-events-none" />
-                )}
-                <button
-                  type="button"
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isProcessing}
-                  className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-xl active:scale-95 ${
-                    isRecording
-                      ? 'bg-rose-600 text-white hover:bg-rose-700 ring-8 ring-rose-500/20'
-                      : isProcessing
-                      ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 animate-pulse'
-                      : 'bg-gradient-to-tr from-vica-teal to-emerald-500 text-white hover:opacity-95 ring-8 ring-vica-teal/20'
-                  }`}
-                >
-                  {isProcessing ? (
-                    <RefreshCw className="w-8 h-8 animate-spin" />
-                  ) : isRecording ? (
-                    <>
-                      <MicOff className="w-8 h-8 sm:w-9 sm:h-9" />
-                      <span className="text-[11px] font-bold mt-1">Concluir</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-8 h-8 sm:w-9 sm:h-9" />
-                      <span className="text-[11px] font-bold mt-1">Toque p/ Falar</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Status / Live Transcription Feedback */}
-              <div className="w-full max-w-md">
-                {isRecording ? (
-                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1.5 animate-pulse">
-                      <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block" />
-                      Ouvindo ({recordingTime}s)... Fale e toque em Concluir
-                    </p>
-                    <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border-2 border-emerald-300 dark:border-emerald-700 min-h-[55px] text-xs text-emerald-950 dark:text-emerald-100 font-medium text-left">
-                      {liveTranscript ? (
-                        <span>"{liveTranscript}"</span>
-                      ) : (
-                        <span className="text-slate-400 italic">Estou ouvindo... fale os dados do paciente...</span>
-                      )}
-                    </div>
+            <div className="flex flex-col items-center justify-center py-3 text-center space-y-4">
+              
+              {/* Recording Animation Wave / Pulse */}
+              {isRecording ? (
+                <div className="space-y-3 w-full max-w-sm py-2">
+                  {/* Soundwave bars */}
+                  <div className="flex items-center justify-center gap-1.5 h-16">
+                    <div className="w-2 bg-rose-500 rounded-full animate-pulse h-8" />
+                    <div className="w-2 bg-rose-600 rounded-full animate-bounce h-14" />
+                    <div className="w-2 bg-rose-500 rounded-full animate-pulse h-10" />
+                    <div className="w-2 bg-rose-600 rounded-full animate-bounce h-16" />
+                    <div className="w-2 bg-rose-500 rounded-full animate-pulse h-12" />
+                    <div className="w-2 bg-rose-600 rounded-full animate-bounce h-14" />
+                    <div className="w-2 bg-rose-500 rounded-full animate-pulse h-8" />
                   </div>
-                ) : isProcessing ? (
-                  <p className="text-sm font-bold text-vica-teal animate-pulse">
-                    ✨ Interpretando dados cirúrgicos do paciente...
-                  </p>
-                ) : (
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Toque no microfone e fale os dados do animal com suas palavras usuais.
-                  </p>
-                )}
-              </div>
+                  
+                  <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center">
+                    <p className="text-xs sm:text-sm font-bold text-rose-700 dark:text-rose-300">
+                      🎙️ Gravando áudio ({recordingTime}s)...
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Fale todos os dados do paciente com calma e toque no botão abaixo ao terminar.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={stopRecording}
+                    className="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-bold text-sm shadow-lg flex items-center justify-center gap-2 transition-transform active:scale-95 ring-4 ring-rose-500/20"
+                  >
+                    <MicOff className="w-5 h-5" />
+                    Concluir e Preencher Ficha
+                  </button>
+                </div>
+              ) : (
+                /* Giant Start Recording Button */
+                <div className="flex flex-col items-center space-y-3">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={startRecording}
+                      disabled={isProcessing}
+                      className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-xl active:scale-95 ${
+                        isProcessing
+                          ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 animate-pulse'
+                          : 'bg-gradient-to-tr from-vica-teal to-emerald-500 text-white hover:opacity-95 ring-8 ring-vica-teal/20'
+                      }`}
+                    >
+                      {isProcessing ? (
+                        <RefreshCw className="w-8 h-8 animate-spin" />
+                      ) : (
+                        <>
+                          <Mic className="w-8 h-8 sm:w-9 sm:h-9" />
+                          <span className="text-[11px] font-bold mt-1">Toque p/ Falar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="w-full max-w-md">
+                    {isProcessing ? (
+                      <p className="text-sm font-bold text-vica-teal animate-pulse">
+                        ✨ Transcrevendo áudio e interpretando dados com IA...
+                      </p>
+                    ) : (
+                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                        Toque no microfone, fale todos os dados e toque em <b>Concluir</b> ao terminar.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Error Message */}
               {errorMsg && (
@@ -447,67 +463,71 @@ export function VoiceRecorderModal({
               )}
 
               {/* Manual text input drawer toggle */}
-              <div className="w-full pt-3 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowTextInput(!showTextInput)}
-                  className="text-xs font-semibold text-vica-blue hover:underline flex items-center justify-center gap-1 mx-auto"
-                >
-                  <Type className="w-3.5 h-3.5" />
-                  {showTextInput ? 'Ocultar digitação manual' : 'Prefere digitar a frase clínica?'}
-                </button>
+              {!isRecording && (
+                <div className="w-full pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowTextInput(!showTextInput)}
+                    className="text-xs font-semibold text-vica-blue hover:underline flex items-center justify-center gap-1 mx-auto"
+                  >
+                    <Type className="w-3.5 h-3.5" />
+                    {showTextInput ? 'Ocultar digitação manual' : 'Prefere digitar ou colar a frase?'}
+                  </button>
 
-                {showTextInput && (
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Ex: Animal 2 gato macho siames Hugo 4 anos 2kg propofol e iso melox e dipi orqui..."
-                      value={manualInputText}
-                      onChange={e => setManualInputText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleProcessText(manualInputText);
-                      }}
-                      className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-vica-teal focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleProcessText(manualInputText)}
-                      disabled={isProcessing || !manualInputText.trim()}
-                      className="px-4 py-2 bg-vica-teal text-white rounded-xl text-xs font-bold shadow-sm"
-                    >
-                      Processar
-                    </button>
+                  {showTextInput && (
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Ex: Animal 2 felino fêmea persa Luna 3.5kg propofol e quetamina..."
+                        value={manualInputText}
+                        onChange={e => setManualInputText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleProcessText(manualInputText);
+                        }}
+                        className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-vica-teal focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleProcessText(manualInputText)}
+                        disabled={isProcessing || !manualInputText.trim()}
+                        className="px-4 py-2 bg-vica-teal text-white rounded-xl text-xs font-bold shadow-sm"
+                      >
+                        Processar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 10 Exemplos Clínicos Reais para Teste com 1 Toque */}
+              {!isRecording && (
+                <div className="w-full pt-2 text-left">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                    💡 10 Frases Prontas para Teste (Toque para Simular):
                   </div>
-                )}
-              </div>
-
-              {/* 5 Exemplos Clínicos Reais para Teste com 1 Toque */}
-              <div className="w-full pt-2 text-left">
-                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                  💡 5 Frases de Teste Prontas (1 Toque):
-                </div>
-                <div className="space-y-2">
-                  {SAMPLE_VOICE_PROMPTS.map((prompt, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleProcessText(prompt.text)}
-                      disabled={isProcessing || isRecording}
-                      className="w-full text-left p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-vica-teal/10 hover:border-vica-teal/40 border border-slate-200 dark:border-slate-700 transition-colors flex items-start justify-between group"
-                    >
-                      <div className="pr-2">
-                        <div className="text-[11px] font-bold text-vica-blue dark:text-sky-400">
-                          {idx + 1}. {prompt.title}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {SAMPLE_VOICE_PROMPTS.map((prompt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleProcessText(prompt.text)}
+                        disabled={isProcessing || isRecording}
+                        className="w-full text-left p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-vica-teal/10 hover:border-vica-teal/40 border border-slate-200 dark:border-slate-700 transition-colors flex items-start justify-between group"
+                      >
+                        <div className="pr-1.5 min-w-0">
+                          <div className="text-[11px] font-bold text-vica-blue dark:text-sky-400 truncate">
+                            {prompt.title}
+                          </div>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            "{prompt.text}"
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-600 dark:text-slate-400 truncate max-w-sm mt-0.5">
-                          "{prompt.text}"
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-vica-teal flex-shrink-0 mt-1" />
-                    </button>
-                  ))}
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-vica-teal flex-shrink-0 mt-0.5" />
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -519,13 +539,13 @@ export function VoiceRecorderModal({
               <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Conferência & Edição Rápida
+                  Ficha Interpretada com Sucesso
                 </div>
                 <button
                   onClick={() => setParsedResult(null)}
                   className="text-xs font-semibold text-emerald-700 hover:underline flex items-center gap-1"
                 >
-                  <RefreshCw className="w-3 h-3" /> Falar de Novo
+                  <RefreshCw className="w-3 h-3" /> Falar Outro Paciente
                 </button>
               </div>
 
@@ -534,7 +554,7 @@ export function VoiceRecorderModal({
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
                     <Edit3 className="w-3.5 h-3.5 text-sky-600" />
-                    Frase Ouvida pelo Sistema (Edite para ajustar se necessário):
+                    Frase Reconhecida (Edite se quiser ajustar e reprocessar):
                   </span>
                   <button
                     type="button"
@@ -623,7 +643,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={patientName}
                       onChange={e => setPatientName(e.target.value)}
-                      placeholder="Ex: Hugo, Miguel, Bob..."
+                      placeholder="Ex: Luna, Bento, Zeus..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs"
                     />
                   </div>
@@ -636,7 +656,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={breed}
                       onChange={e => setBreed(e.target.value)}
-                      placeholder="Ex: Siamês, SRD..."
+                      placeholder="Ex: Persa, Shih Tzu..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold"
                     />
                   </div>
@@ -766,7 +786,7 @@ export function VoiceRecorderModal({
                       step="0.1"
                       value={weightKg}
                       onChange={e => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Ex: 2"
+                      placeholder="Ex: 3.5"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center font-bold text-xs"
                     />
                   </div>
@@ -779,7 +799,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={age}
                       onChange={e => setAge(e.target.value)}
-                      placeholder="Ex: 4 anos"
+                      placeholder="Ex: 3 anos"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-xs"
                     />
                   </div>
@@ -879,7 +899,7 @@ export function VoiceRecorderModal({
                       rows={2}
                       value={complicationNotes}
                       onChange={e => setComplicationNotes(e.target.value)}
-                      placeholder="Descreva a intercorrência (ex: Pequena bradicardia no início...)"
+                      placeholder="Descreva a intercorrência (ex: Hipotermia leve revertida com colchão térmico...)"
                       className="mt-2 w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 rounded-xl text-xs text-rose-900 dark:text-rose-200 focus:outline-none focus:ring-2 focus:ring-rose-500"
                     />
                   )}

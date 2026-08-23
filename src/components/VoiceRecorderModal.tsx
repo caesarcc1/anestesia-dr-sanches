@@ -60,8 +60,28 @@ export function VoiceRecorderModal({
 
   const nextDefaultOrder = existingRecords.length + 1;
 
-  // 5 Exemplos reais e práticos para testes com 1 toque
+  // 10 Exemplos reais e práticos para testes com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
+    {
+      title: 'Bento (Shih Tzu c/ Nodulectomia / Procedimento 3)',
+      text: 'Animal 1, cão, macho, Shih Tzu, Bento, 6kg, 7 anos, propofol e isoflurano, pós melox e agemoxi, procedimento 3 nodulectomia. Sem intercorrências.',
+    },
+    {
+      title: 'Luna (Gata Persa Chipada c/ Hipotermia)',
+      text: 'Animal 2, felino, fêmea, persa, Luna, 3.5kg, 3 anos, microchip 982000543210, propofol e quetamina, feito dipirona no pós, OSH. Intercorrência: Hipotermia leve revertida com colchão térmico.',
+    },
+    {
+      title: 'Zeus (Rottweiler Pesado c/ Xilazina e Tramal)',
+      text: 'Animal 3, canino, macho, Rottweiler, Zeus, 42kg, 4 anos, xila e tramal e propo, agemoxi e melox de pós, castração de macho. Sem intercorrências.',
+    },
+    {
+      title: 'Mimi (Gata SRD Filhote c/ Vitamina K e Transamin)',
+      text: 'Animal 4, gato, fêmea, SRD, Mimi, 1.8kg, 8 meses, quetamina e transamin e vit k, pós meloxicam e dipirona, procedimento 2. Obs: Sangramento capilar discreto estancado.',
+    },
+    {
+      title: 'Spike (Pinscher Idoso c/ Apneia Transitória)',
+      text: 'Animal 5, cão, macho, Pinscher, Spike, 3kg, 10 anos, microchip 982000887766, propofol e iso, dipi de pós, orqui. Intercorrência: Apneia transitória após indução.',
+    },
     {
       title: 'Hugo (Gato Siamês c/ abreviações e bradicardia)',
       text: 'Animal 2, gato, macho, siamês, Hugo, 4 anos, 2kg, propofol e iso, melox e dipi de pós, orqui. Intercorrência: Pequena bradicardia no início.',

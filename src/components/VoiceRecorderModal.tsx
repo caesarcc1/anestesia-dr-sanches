@@ -54,6 +54,7 @@ export function VoiceRecorderModal({
   const [showTranscriptEditor, setShowTranscriptEditor] = useState(true);
 
   const recognitionRef = useRef<any>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const isRecordingRef = useRef(false);
   const finalizedSegmentsRef = useRef<string[]>([]);
   const currentSegmentRef = useRef<string>('');
@@ -114,6 +115,10 @@ export function VoiceRecorderModal({
   const handleReset = () => {
     if (isRecordingRef.current) {
       stopRecording();
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
     setIsRecording(false);
     isRecordingRef.current = false;
@@ -191,6 +196,22 @@ export function VoiceRecorderModal({
     }
 
     try {
+      // Ativa ganho de hardware e cancelamento de ruído no Android / Navegador
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+          });
+          mediaStreamRef.current = stream;
+        } catch (mediaErr) {
+          console.warn('AutoGain aviso (continuando com reconhecimento padrão):', mediaErr);
+        }
+      }
+
       const recognition = new SpeechRecognition();
       recognition.lang = 'pt-BR';
       recognition.continuous = true;
@@ -258,6 +279,11 @@ export function VoiceRecorderModal({
         recognitionRef.current.stop();
       } catch {}
       recognitionRef.current = null;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
     }
 
     setIsProcessing(true);

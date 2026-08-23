@@ -1,5 +1,73 @@
 import { ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode } from '@/types';
 
+// Normaliza números por extenso em português para dígitos numéricos
+export function normalizeSpokenPortugueseNumbers(text: string): string {
+  const numberWords: [RegExp, string][] = [
+    [/\b(quarenta e nove)\b/gi, '49'],
+    [/\b(quarenta e oito)\b/gi, '48'],
+    [/\b(quarenta e sete)\b/gi, '47'],
+    [/\b(quarenta e seis)\b/gi, '46'],
+    [/\b(quarenta e cinco)\b/gi, '45'],
+    [/\b(quarenta e quatro)\b/gi, '44'],
+    [/\b(quarenta e três|quarenta e tres)\b/gi, '43'],
+    [/\b(quarenta e dois)\b/gi, '42'],
+    [/\b(quarenta e um)\b/gi, '41'],
+    [/\b(quarenta)\b/gi, '40'],
+    [/\b(trinta e nove)\b/gi, '39'],
+    [/\b(trinta e oito)\b/gi, '38'],
+    [/\b(trinta e sete)\b/gi, '37'],
+    [/\b(trinta e seis)\b/gi, '36'],
+    [/\b(trinta e cinco)\b/gi, '35'],
+    [/\b(trinta e quatro)\b/gi, '34'],
+    [/\b(trinta e três|trinta e tres)\b/gi, '33'],
+    [/\b(trinta e dois)\b/gi, '32'],
+    [/\b(trinta e um)\b/gi, '31'],
+    [/\b(trinta)\b/gi, '30'],
+    [/\b(vinte e nove)\b/gi, '29'],
+    [/\b(vinte e oito)\b/gi, '28'],
+    [/\b(vinte e sete)\b/gi, '27'],
+    [/\b(vinte e seis)\b/gi, '26'],
+    [/\b(vinte e cinco)\b/gi, '25'],
+    [/\b(vinte e quatro)\b/gi, '24'],
+    [/\b(vinte e três|vinte e tres)\b/gi, '23'],
+    [/\b(vinte e dois)\b/gi, '22'],
+    [/\b(vinte e um)\b/gi, '21'],
+    [/\b(vinte)\b/gi, '20'],
+    [/\b(dezenove)\b/gi, '19'],
+    [/\b(dezoito)\b/gi, '18'],
+    [/\b(dezessete)\b/gi, '17'],
+    [/\b(dezesseis)\b/gi, '16'],
+    [/\b(quinze)\b/gi, '15'],
+    [/\b(quatorze|catorze)\b/gi, '14'],
+    [/\b(treze)\b/gi, '13'],
+    [/\b(doze)\b/gi, '12'],
+    [/\b(onze)\b/gi, '11'],
+    [/\b(dez)\b/gi, '10'],
+    [/\b(nove)\b/gi, '9'],
+    [/\b(oito)\b/gi, '8'],
+    [/\b(sete)\b/gi, '7'],
+    [/\b(seis|meia)\b/gi, '6'],
+    [/\b(cinco)\b/gi, '5'],
+    [/\b(quatro)\b/gi, '4'],
+    [/\b(três|tres)\b/gi, '3'],
+    [/\b(dois|duas)\b/gi, '2'],
+    [/\b(um|uma)\b/gi, '1'],
+    [/\b(zero)\b/gi, '0'],
+  ];
+
+  let res = text;
+  // Converte "três quilos e meio" -> "3.5kg", "dois quilos e meio" -> "2.5kg", "quatro e meio" -> "4.5"
+  res = res.replace(/(\d+)\s*(?:quilos?|kg)?\s*e\s*meio/gi, '$1.5kg');
+  res = res.replace(/(?:três|tres)\s*(?:quilos?|kg)?\s*e\s*meio/gi, '3.5kg');
+  res = res.replace(/(?:dois|duas)\s*(?:quilos?|kg)?\s*e\s*meio/gi, '2.5kg');
+  res = res.replace(/(?:um|uma)\s*(?:quilo|kg)?\s*e\s*meio/gi, '1.5kg');
+
+  for (const [pattern, num] of numberWords) {
+    res = res.replace(pattern, num);
+  }
+  return res;
+}
+
 // Função de desduplicação e limpeza de fala para eliminar repetições consecutivas
 export function cleanAndDeduplicateSpeech(raw: string): string {
   if (!raw) return '';
@@ -11,7 +79,8 @@ export function cleanAndDeduplicateSpeech(raw: string): string {
 
 // Fallback rule-based parser in case no GEMINI_API_KEY is configured or model fails
 export function parseWithRegex(rawText: string): ParsedVoiceResult {
-  const text = cleanAndDeduplicateSpeech(rawText);
+  const textCleaned = cleanAndDeduplicateSpeech(rawText);
+  const text = normalizeSpokenPortugueseNumbers(textCleaned);
   const lower = text.toLowerCase();
   
   // 1. Número do animal/paciente falado (ex: "animal 9", "animal 15", "paciente 14", "número 11")
@@ -112,7 +181,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
       'Lulu', 'Thor', 'Amora', 'Nina', 'Max', 'Pipoca', 'Belinha', 'Billy', 'Ted', 'Simba',
       'Meg', 'Mia', 'Chico', 'Fred', 'Toby', 'Marley', 'Pandora', 'Snoopy', 'Jack', 'Apolo',
       'Cookie', 'Pretinha', 'Rex', 'Duque', 'Tobby', 'Suzi', 'Bidu', 'Costelinha', 'Caramelo',
-      'Fumaça', 'Floquinho', 'Pérola', 'Sol', 'Lola', 'Theo', 'Simba', 'Babi', 'Maya'
+      'Fumaça', 'Floquinho', 'Pérola', 'Sol', 'Lola', 'Theo', 'Babi', 'Maya'
     ];
     for (const name of popularNames) {
       const regex = new RegExp(`\\b${name}\\b`, 'i');

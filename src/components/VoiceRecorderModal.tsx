@@ -57,9 +57,9 @@ export function VoiceRecorderModal({
 
   // Exemplos rápidos para testes com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
+    'Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona de pós, procedimento 1. Sem intercorrências',
     'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
     'Animal 9, cão, de nome Lulu, 12 quilos, 3 anos, microchip 982000362, Propofol e Quetamina, pós Meloxicam e Dipirona, ORQ',
-    'Canino fêmea Pitbull Mel 18kg 3 anos microchip 982000456 Propofol Isoflurano Meloxicam Dipirona OSH sem intercorrências',
   ];
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export function VoiceRecorderModal({
     setOrderWarning(null);
   };
 
-  // Preenche todos os campos editáveis a partir do resultado retornado pela IA ou parser
+  // Preenche todos os campos editáveis a partir do resultado retornado
   const populateEditableFields = (data: ParsedVoiceResult) => {
     setParsedResult(data);
     setPatientName(data.patient_name || 'Paciente');
@@ -103,23 +103,23 @@ export function VoiceRecorderModal({
     setObservations(data.observations || '');
 
     // Validação inteligente de numeração do paciente
-    if (data.spoken_order_index !== undefined && data.spoken_order_index !== null) {
+    if (data.spoken_order_index !== undefined && data.spoken_order_index !== null && data.spoken_order_index > 0) {
       const spokenNum = data.spoken_order_index;
       const alreadyExists = existingRecords.some(r => r.order_index === spokenNum);
 
+      // Mantém o número falado no input
+      setOrderIndex(spokenNum);
+
       if (alreadyExists) {
-        setOrderIndex(spokenNum);
         const existingRecord = existingRecords.find(r => r.order_index === spokenNum);
         setOrderWarning(
-          `⚠️ Você falou Animal #${spokenNum}, mas o #${spokenNum} (${existingRecord?.patient_name || 'já cadastrado'}) já existe na ficha de hoje. O próximo sequencial livre é #${nextDefaultOrder}.`
+          `⚠️ Você falou Animal #${spokenNum}, mas o #${spokenNum} (${existingRecord?.patient_name || 'já registrado'}) já existe na ficha de hoje. O próximo sequencial livre é #${nextDefaultOrder}.`
         );
       } else if (spokenNum > nextDefaultOrder) {
-        setOrderIndex(spokenNum);
         setOrderWarning(
-          `⚠️ Você falou Animal #${spokenNum}, mas o próximo na sequência seria #${nextDefaultOrder} (pulou ${spokenNum - nextDefaultOrder} posições).`
+          `⚠️ Você falou Animal #${spokenNum}, mas o próximo na sequência de hoje seria #${nextDefaultOrder} (pulou ${spokenNum - nextDefaultOrder} posições). Deseja manter #${spokenNum} ou ajustar para #${nextDefaultOrder}?`
         );
       } else {
-        setOrderIndex(spokenNum);
         setOrderWarning(null);
       }
     } else {
@@ -269,7 +269,7 @@ export function VoiceRecorderModal({
           populateEditableFields(data.data);
           setLiveTranscript(data.data.raw_transcription || 'Áudio processado com sucesso');
         } else {
-          setErrorMsg(data.error || 'Não foi possível extrair os dados do áudio.');
+          setErrorMsg(data.error || 'Não foi possível extrair os dados do áudio. Tente novamente ou use os exemplos.');
         }
         setIsProcessing(false);
       };
@@ -371,7 +371,7 @@ export function VoiceRecorderModal({
                   Cadastro por Comando de Voz
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  v1.3.0
+                  v1.4.0
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -448,7 +448,7 @@ export function VoiceRecorderModal({
                   </p>
                 ) : (
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xs">
-                    Ex: <span className="italic font-medium">"Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Queta, Meloxicam, Procedimento 1"</span>
+                    Ex: <span className="italic font-medium">"Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona, procedimento 1"</span>
                   </p>
                 )}
               </div>
@@ -476,7 +476,7 @@ export function VoiceRecorderModal({
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ex: Animal 11 Macho Poodle Bob 12kg Propofol..."
+                      placeholder="Ex: Animal 15 gato fêmea SRD princesa 2kg 1 ano Propofol..."
                       value={manualInputText}
                       onChange={e => setManualInputText(e.target.value)}
                       onKeyDown={e => {
@@ -539,28 +539,28 @@ export function VoiceRecorderModal({
 
               {/* Order index conflict warning */}
               {orderWarning && (
-                <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-2">
-                  <div className="flex items-start gap-2">
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs space-y-2.5 shadow-sm">
+                  <div className="flex items-start gap-2 font-medium">
                     <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                     <span>{orderWarning}</span>
                   </div>
-                  <div className="flex items-center gap-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
                     <button
                       type="button"
                       onClick={() => {
                         setOrderIndex(nextDefaultOrder);
                         setOrderWarning(null);
                       }}
-                      className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs shadow-xs"
+                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-sm active:scale-95"
                     >
-                      Ajustar para Sequência (#{nextDefaultOrder})
+                      ⚡ Ajustar para Sequência (#{nextDefaultOrder})
                     </button>
                     <button
                       type="button"
                       onClick={() => setOrderWarning(null)}
-                      className="px-2.5 py-1 text-slate-600 dark:text-slate-300 hover:underline text-xs font-semibold"
+                      className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-100"
                     >
-                      Manter #{orderIndex}
+                      ✅ Manter #{orderIndex} (Confirmar)
                     </button>
                   </div>
                 </div>
@@ -591,7 +591,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={patientName}
                       onChange={e => setPatientName(e.target.value)}
-                      placeholder="Ex: Lulu, Thor, Bob..."
+                      placeholder="Ex: Princesa, Lulu, Bob..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs"
                     />
                   </div>
@@ -734,7 +734,7 @@ export function VoiceRecorderModal({
                       step="0.1"
                       value={weightKg}
                       onChange={e => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Ex: 12"
+                      placeholder="Ex: 2"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center font-bold text-xs"
                     />
                   </div>
@@ -747,7 +747,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={age}
                       onChange={e => setAge(e.target.value)}
-                      placeholder="Ex: 3 anos"
+                      placeholder="Ex: 1 ano"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-xs"
                     />
                   </div>

@@ -1,0 +1,21 @@
+{
+  "name": "Anestesia Dr. Sanches - Adote Vi.Ca",
+  "short_name": "Anestesia Vi.Ca",
+  "description": "Sistema de Registro Anestésico Veterinário Hands-Free",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e293b",
+  "theme_color": "#1ea58d",
+  "icons": [
+    {
+      "src": "/logo-vica.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-vica.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

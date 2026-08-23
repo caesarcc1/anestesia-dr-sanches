@@ -55,11 +55,11 @@ export function VoiceRecorderModal({
 
   const nextDefaultOrder = existingRecords.length + 1;
 
-  // Exemplos rápidos para testes com 1 toque
+  // Exemplos reais para testes rápidos com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
+    'Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, feito agemoxi no pós, procedimento 2. Sem intercorrências',
     'Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona de pós, procedimento 1. Sem intercorrências',
     'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
-    'Animal 9, cão, de nome Lulu, 12 quilos, 3 anos, microchip 982000362, Propofol e Quetamina, pós Meloxicam e Dipirona, ORQ',
   ];
 
   useEffect(() => {
@@ -136,6 +136,7 @@ export function VoiceRecorderModal({
     audioChunksRef.current = [];
 
     // 1. Inicia Web Speech Recognition no navegador (se disponível)
+    let recognitionStarted = false;
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -161,13 +162,14 @@ export function VoiceRecorderModal({
 
           recognition.start();
           recognitionRef.current = recognition;
+          recognitionStarted = true;
         } catch (recErr) {
           console.warn('Não foi possível iniciar SpeechRecognition:', recErr);
         }
       }
     }
 
-    // 2. Inicia gravação de áudio MediaRecorder
+    // 2. Inicia gravação de áudio MediaRecorder como suporte
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
@@ -205,15 +207,15 @@ export function VoiceRecorderModal({
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      console.warn('Microfone não acessível:', err);
-      if (recognitionRef.current) {
+      console.warn('Microfone MediaRecorder erro:', err);
+      if (recognitionStarted) {
         setIsRecording(true);
         setRecordingTime(0);
         timerRef.current = setInterval(() => {
           setRecordingTime((prev) => prev + 1);
         }, 1000);
       } else {
-        setErrorMsg('Microfone não autorizado ou indisponível. Você pode usar os exemplos abaixo ou digitar.');
+        setErrorMsg('Microfone não autorizado ou bloqueado. Use os exemplos abaixo ou digite a frase.');
       }
     }
   };
@@ -233,7 +235,14 @@ export function VoiceRecorderModal({
     }
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.requestData();
+        mediaRecorderRef.current.stop();
+      } catch {
+        if (liveTranscriptRef.current) {
+          handleProcessText(liveTranscriptRef.current);
+        }
+      }
     } else if (liveTranscriptRef.current) {
       handleProcessText(liveTranscriptRef.current);
     }
@@ -244,7 +253,8 @@ export function VoiceRecorderModal({
     setErrorMsg(null);
 
     try {
-      if (textTranscript && textTranscript.trim().length > 3) {
+      // Se já temos a transcrição captada pelo navegador, processamos diretamente
+      if (textTranscript && textTranscript.trim().length > 2) {
         await handleProcessText(textTranscript);
         return;
       }
@@ -269,7 +279,7 @@ export function VoiceRecorderModal({
           populateEditableFields(data.data);
           setLiveTranscript(data.data.raw_transcription || 'Áudio processado com sucesso');
         } else {
-          setErrorMsg(data.error || 'Não foi possível extrair os dados do áudio. Tente novamente ou use os exemplos.');
+          setErrorMsg(data.error || 'Não foi possível extrair os dados do áudio. Tente falar novamente ou use a digitação rápida.');
         }
         setIsProcessing(false);
       };
@@ -371,7 +381,7 @@ export function VoiceRecorderModal({
                   Cadastro por Comando de Voz
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  v1.4.0
+                  v1.5.0
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -448,7 +458,7 @@ export function VoiceRecorderModal({
                   </p>
                 ) : (
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xs">
-                    Ex: <span className="italic font-medium">"Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona, procedimento 1"</span>
+                    Ex: <span className="italic font-medium">"Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, agemoxi, procedimento 2"</span>
                   </p>
                 )}
               </div>
@@ -476,7 +486,7 @@ export function VoiceRecorderModal({
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ex: Animal 15 gato fêmea SRD princesa 2kg 1 ano Propofol..."
+                      placeholder="Ex: Animal 9 cão macho galgo italiano nome Miguel 24kg..."
                       value={manualInputText}
                       onChange={e => setManualInputText(e.target.value)}
                       onKeyDown={e => {
@@ -499,7 +509,7 @@ export function VoiceRecorderModal({
               {/* Test with Sample Prompts */}
               <div className="w-full pt-2 text-left">
                 <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-                  Ou teste com frases de exemplo (1 toque):
+                  Ou teste com frases reais (1 toque):
                 </div>
                 <div className="space-y-2">
                   {SAMPLE_VOICE_PROMPTS.map((prompt, idx) => (
@@ -591,7 +601,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={patientName}
                       onChange={e => setPatientName(e.target.value)}
-                      placeholder="Ex: Princesa, Lulu, Bob..."
+                      placeholder="Ex: Miguel, Princesa, Bob..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs"
                     />
                   </div>
@@ -604,7 +614,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={breed}
                       onChange={e => setBreed(e.target.value)}
-                      placeholder="Ex: SRD, Poodle..."
+                      placeholder="Ex: Galgo Italiano, SRD..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold"
                     />
                   </div>
@@ -734,7 +744,7 @@ export function VoiceRecorderModal({
                       step="0.1"
                       value={weightKg}
                       onChange={e => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Ex: 2"
+                      placeholder="Ex: 24"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center font-bold text-xs"
                     />
                   </div>
@@ -747,7 +757,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={age}
                       onChange={e => setAge(e.target.value)}
-                      placeholder="Ex: 1 ano"
+                      placeholder="Ex: 5 anos"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-xs"
                     />
                   </div>

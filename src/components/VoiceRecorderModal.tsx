@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AnesthesiaRecord, ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode, ANESTHESIA_DRUGS, POST_MEDS } from '@/types';
-import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight, Type, Edit3, CheckCircle2 } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight, Type, Edit3, CheckCircle2, Waves } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface VoiceRecorderModalProps {
@@ -47,19 +47,35 @@ export function VoiceRecorderModal({
   const [orderIndex, setOrderIndex] = useState<number>(1);
   const [orderWarning, setOrderWarning] = useState<string | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recognitionRef = useRef<any>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const isRecordingRef = useRef(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const liveTranscriptRef = useRef('');
 
   const nextDefaultOrder = existingRecords.length + 1;
 
-  // Exemplos reais para testes rápidos com 1 toque
+  // 5 Exemplos reais e práticos para testes com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
-    'Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, feito agemoxi no pós, procedimento 2. Sem intercorrências',
-    'Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona de pós, procedimento 1. Sem intercorrências',
-    'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
+    {
+      title: 'Hugo (Gato Siamês c/ abreviações e bradicardia)',
+      text: 'Animal 2, gato, macho, siamês, Hugo, 4 anos, 2kg, propofol e iso, melox e dipi de pós, orqui. Intercorrência: Pequena bradicardia no início.',
+    },
+    {
+      title: 'Miguel (Galgo Italiano c/ xilazina e tramadol)',
+      text: 'Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, feito agemoxi no pós, procedimento 2. Sem intercorrências.',
+    },
+    {
+      title: 'Princesa (Gata Fêmea SRD c/ dipirona)',
+      text: 'Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona de pós, procedimento 1. Sem intercorrências',
+    },
+    {
+      title: 'Bob (Poodle Macho c/ propofol e queta)',
+      text: 'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
+    },
+    {
+      title: 'Mel (Cadela Pitbull Chipada c/ OSH)',
+      text: 'Paciente 3 cadela Pitbull Mel 18kg 3 anos Microchip 982000456 Propofol Isoflurano Meloxicam Dipirona OSH',
+    },
   ];
 
   useEffect(() => {
@@ -69,10 +85,11 @@ export function VoiceRecorderModal({
   }, [isOpen]);
 
   const handleReset = () => {
-    if (isRecording) {
+    if (isRecordingRef.current) {
       stopRecording();
     }
     setIsRecording(false);
+    isRecordingRef.current = false;
     setRecordingTime(0);
     setIsProcessing(false);
     setLiveTranscript('');
@@ -133,95 +150,72 @@ export function VoiceRecorderModal({
     setLiveTranscript('');
     liveTranscriptRef.current = '';
     setParsedResult(null);
-    audioChunksRef.current = [];
 
-    // 1. Inicia Web Speech Recognition no navegador (se disponível)
-    let recognitionStarted = false;
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.lang = 'pt-BR';
-          recognition.continuous = true;
-          recognition.interimResults = true;
+    const SpeechRecognition = typeof window !== 'undefined'
+      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      : null;
 
-          recognition.onresult = (event: any) => {
-            let current = '';
-            for (let i = 0; i < event.results.length; i++) {
-              current += event.results[i][0].transcript + ' ';
-            }
-            const trimmed = current.trim();
-            setLiveTranscript(trimmed);
-            liveTranscriptRef.current = trimmed;
-          };
-
-          recognition.onerror = (e: any) => {
-            console.warn('SpeechRecognition aviso:', e);
-          };
-
-          recognition.start();
-          recognitionRef.current = recognition;
-          recognitionStarted = true;
-        } catch (recErr) {
-          console.warn('Não foi possível iniciar SpeechRecognition:', recErr);
-        }
-      }
+    if (!SpeechRecognition) {
+      setErrorMsg('O seu navegador não suporta reconhecimento de voz direto. Você pode usar os exemplos abaixo ou digitar a frase.');
+      setShowTextInput(true);
+      return;
     }
 
-    // 2. Inicia gravação de áudio MediaRecorder como suporte
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      let mimeType = 'audio/webm';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          mimeType = 'audio/webm;codecs=opus';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-          mimeType = 'audio/aac';
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event: any) => {
+        let full = '';
+        for (let i = 0; i < event.results.length; i++) {
+          full += event.results[i][0].transcript + ' ';
         }
-      }
-
-      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+        const trimmed = full.trim();
+        if (trimmed) {
+          setLiveTranscript(trimmed);
+          liveTranscriptRef.current = trimmed;
         }
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        await processAudioAndText(audioBlob, liveTranscriptRef.current);
-        stream.getTracks().forEach(track => track.stop());
+      recognition.onerror = (e: any) => {
+        console.warn('SpeechRecognition erro:', e.error);
+        if (e.error === 'not-allowed') {
+          setErrorMsg('Acesso ao microfone negado. Por favor, permita o microfone no cadeado do navegador.');
+        }
       };
 
-      mediaRecorder.start(250);
+      recognition.onend = () => {
+        // Se ainda estiver no modo de gravação no mobile, reativa automaticamente
+        if (isRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch {}
+        }
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
       setIsRecording(true);
+      isRecordingRef.current = true;
       setRecordingTime(0);
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      console.warn('Microfone MediaRecorder erro:', err);
-      if (recognitionStarted) {
-        setIsRecording(true);
-        setRecordingTime(0);
-        timerRef.current = setInterval(() => {
-          setRecordingTime((prev) => prev + 1);
-        }, 1000);
-      } else {
-        setErrorMsg('Microfone não autorizado ou bloqueado. Use os exemplos abaixo ou digite a frase.');
-      }
+      console.warn('Falha ao iniciar SpeechRecognition:', err);
+      setErrorMsg('Não foi possível ativar o microfone. Tente novamente ou use a digitação rápida.');
+      setShowTextInput(true);
     }
   };
 
   const stopRecording = () => {
     setIsRecording(false);
+    isRecordingRef.current = false;
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -234,58 +228,11 @@ export function VoiceRecorderModal({
       recognitionRef.current = null;
     }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      try {
-        mediaRecorderRef.current.requestData();
-        mediaRecorderRef.current.stop();
-      } catch {
-        if (liveTranscriptRef.current) {
-          handleProcessText(liveTranscriptRef.current);
-        }
-      }
-    } else if (liveTranscriptRef.current) {
-      handleProcessText(liveTranscriptRef.current);
-    }
-  };
-
-  const processAudioAndText = async (audioBlob: Blob, textTranscript: string) => {
-    setIsProcessing(true);
-    setErrorMsg(null);
-
-    try {
-      // Se já temos a transcrição captada pelo navegador, processamos diretamente
-      if (textTranscript && textTranscript.trim().length > 2) {
-        await handleProcessText(textTranscript);
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.readAsDataURL(audioBlob);
-      reader.onloadend = async () => {
-        const base64Audio = (reader.result as string).split(',')[1];
-        
-        const response = await fetch('/api/voice-parse', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audioBase64: base64Audio,
-            mimeType: audioBlob.type || 'audio/webm',
-            text: textTranscript || '',
-          }),
-        });
-
-        const data = await response.json();
-        if (data.success && data.data) {
-          populateEditableFields(data.data);
-          setLiveTranscript(data.data.raw_transcription || 'Áudio processado com sucesso');
-        } else {
-          setErrorMsg(data.error || 'Não foi possível extrair os dados do áudio. Tente falar novamente ou use a digitação rápida.');
-        }
-        setIsProcessing(false);
-      };
-    } catch (err: any) {
-      setIsProcessing(false);
-      setErrorMsg('Falha ao processar o áudio. Tente novamente.');
+    const textToParse = liveTranscriptRef.current.trim();
+    if (textToParse && textToParse.length > 2) {
+      handleProcessText(textToParse);
+    } else {
+      setErrorMsg('Nenhuma fala foi capturada. Fale mais perto do microfone ou use os botões rápidos.');
     }
   };
 
@@ -381,7 +328,7 @@ export function VoiceRecorderModal({
                   Cadastro por Comando de Voz
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  v1.5.0
+                  v1.6.0
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -425,7 +372,7 @@ export function VoiceRecorderModal({
                   ) : isRecording ? (
                     <>
                       <MicOff className="w-8 h-8 sm:w-9 sm:h-9" />
-                      <span className="text-[11px] font-bold mt-1">Parar</span>
+                      <span className="text-[11px] font-bold mt-1">Concluir</span>
                     </>
                   ) : (
                     <>
@@ -437,28 +384,28 @@ export function VoiceRecorderModal({
               </div>
 
               {/* Status / Live Transcription Feedback */}
-              <div>
+              <div className="w-full max-w-md">
                 {isRecording ? (
-                  <div className="space-y-2 max-w-sm">
+                  <div className="space-y-2">
                     <p className="text-sm font-bold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1.5 animate-pulse">
                       <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block" />
-                      Ouvindo ({recordingTime}s)... Toque no botão para finalizar
+                      Ouvindo ({recordingTime}s)... Fale naturalmente e toque em Concluir
                     </p>
-                    {liveTranscript ? (
-                      <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 italic border border-slate-200 dark:border-slate-700">
-                        "{liveTranscript}"
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400">Pode ditar os dados do animal...</p>
-                    )}
+                    <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border-2 border-emerald-300 dark:border-emerald-700 min-h-[55px] text-xs text-emerald-950 dark:text-emerald-100 font-medium text-left">
+                      {liveTranscript ? (
+                        <span>"{liveTranscript}"</span>
+                      ) : (
+                        <span className="text-slate-400 italic">Estou ouvindo... fale os dados do paciente...</span>
+                      )}
+                    </div>
                   </div>
                 ) : isProcessing ? (
                   <p className="text-sm font-bold text-vica-teal animate-pulse">
                     ✨ Interpretando dados cirúrgicos do paciente...
                   </p>
                 ) : (
-                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xs">
-                    Ex: <span className="italic font-medium">"Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, agemoxi, procedimento 2"</span>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                    Toque no microfone e fale os dados do animal com suas palavras ou abreviações usuais.
                   </p>
                 )}
               </div>
@@ -479,14 +426,14 @@ export function VoiceRecorderModal({
                   className="text-xs font-semibold text-vica-blue hover:underline flex items-center justify-center gap-1 mx-auto"
                 >
                   <Type className="w-3.5 h-3.5" />
-                  {showTextInput ? 'Ocultar digitação manual' : 'Prefere digitar a frase?'}
+                  {showTextInput ? 'Ocultar digitação manual' : 'Prefere digitar a frase clínica?'}
                 </button>
 
                 {showTextInput && (
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ex: Animal 9 cão macho galgo italiano nome Miguel 24kg..."
+                      placeholder="Ex: Animal 2 gato macho siames Hugo 4 anos 2kg propofol e iso melox e dipi orqui..."
                       value={manualInputText}
                       onChange={e => setManualInputText(e.target.value)}
                       onKeyDown={e => {
@@ -506,22 +453,29 @@ export function VoiceRecorderModal({
                 )}
               </div>
 
-              {/* Test with Sample Prompts */}
+              {/* 5 Exemplos Clínicos Reais para Teste com 1 Toque */}
               <div className="w-full pt-2 text-left">
-                <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-                  Ou teste com frases reais (1 toque):
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                  <span>💡 5 Frases de Teste Prontas (1 Toque):</span>
                 </div>
                 <div className="space-y-2">
                   {SAMPLE_VOICE_PROMPTS.map((prompt, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => handleProcessText(prompt)}
+                      onClick={() => handleProcessText(prompt.text)}
                       disabled={isProcessing || isRecording}
-                      className="w-full text-left p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-vica-teal/10 hover:border-vica-teal/40 border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-between group"
+                      className="w-full text-left p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 hover:bg-vica-teal/10 hover:border-vica-teal/40 border border-slate-200 dark:border-slate-700 transition-colors flex items-start justify-between group"
                     >
-                      <span className="truncate pr-2">{prompt}</span>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-vica-teal flex-shrink-0" />
+                      <div className="pr-2">
+                        <div className="text-[11px] font-bold text-vica-blue dark:text-sky-400">
+                          {idx + 1}. {prompt.title}
+                        </div>
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 truncate max-w-sm mt-0.5">
+                          "{prompt.text}"
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-vica-teal flex-shrink-0 mt-1" />
                     </button>
                   ))}
                 </div>
@@ -601,7 +555,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={patientName}
                       onChange={e => setPatientName(e.target.value)}
-                      placeholder="Ex: Miguel, Princesa, Bob..."
+                      placeholder="Ex: Hugo, Miguel, Bob..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs"
                     />
                   </div>
@@ -614,7 +568,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={breed}
                       onChange={e => setBreed(e.target.value)}
-                      placeholder="Ex: Galgo Italiano, SRD..."
+                      placeholder="Ex: Siamês, SRD..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-xs font-semibold"
                     />
                   </div>
@@ -744,7 +698,7 @@ export function VoiceRecorderModal({
                       step="0.1"
                       value={weightKg}
                       onChange={e => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Ex: 24"
+                      placeholder="Ex: 2"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center font-bold text-xs"
                     />
                   </div>
@@ -757,7 +711,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={age}
                       onChange={e => setAge(e.target.value)}
-                      placeholder="Ex: 5 anos"
+                      placeholder="Ex: 4 anos"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center text-xs"
                     />
                   </div>
@@ -857,7 +811,7 @@ export function VoiceRecorderModal({
                       rows={2}
                       value={complicationNotes}
                       onChange={e => setComplicationNotes(e.target.value)}
-                      placeholder="Descreva a intercorrência (ex: Hipotermia, Bradicardia, Hemorragia...)"
+                      placeholder="Descreva a intercorrência (ex: Pequena bradicardia no início...)"
                       className="mt-2 w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-rose-300 dark:border-rose-800 rounded-xl text-xs text-rose-900 dark:text-rose-200 focus:outline-none focus:ring-2 focus:ring-rose-500"
                     />
                   )}

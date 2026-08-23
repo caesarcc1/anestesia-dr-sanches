@@ -2,12 +2,32 @@ import { parseWithRegex } from '../src/lib/voice-parser';
 import { ParsedVoiceResult } from '../src/types';
 
 interface TestCase {
+  name: string;
   input: string;
   expected: Partial<ParsedVoiceResult>;
 }
 
 const testCases: TestCase[] = [
   {
+    name: 'Caso Hugo (Gato Siamês c/ abreviações e intercorrência)',
+    input: 'Animal 2, gato, macho, siamês, Hugo, 4 anos, 2kg, propofol e iso, melox e dipi de pós, orqui. Intercorrência: Pequena bradicardia no início.',
+    expected: {
+      spoken_order_index: 2,
+      species: 'FEL',
+      sex: 'M',
+      breed: 'Siamês',
+      patient_name: 'Hugo',
+      weight_kg: 2,
+      age: '4 anos',
+      anesthesia_drugs: ['P', 'I'],
+      post_meds: ['M', 'D'],
+      procedure_type: 'ORQ',
+      has_complication: true,
+      complication_notes: 'Pequena bradicardia no início',
+    }
+  },
+  {
+    name: 'Caso Miguel (Galgo Italiano c/ xila e tramal)',
     input: 'Animal 9, cão, macho, galgo italiano, nome Miguel, 24kg, 5 anos, xilazina e tramadol, feito agemoxi no pós, procedimento 2. Sem intercorrências.',
     expected: {
       spoken_order_index: 9,
@@ -24,6 +44,7 @@ const testCases: TestCase[] = [
     }
   },
   {
+    name: 'Caso Princesa (Gata SRD)',
     input: 'Animal 15, gato, fêmea, SRD, princesa, 2kg, 1 ano, propofol e quetamina, dipirona de pós, procedimento 1. Sem intercorrências',
     expected: {
       spoken_order_index: 15,
@@ -40,6 +61,7 @@ const testCases: TestCase[] = [
     }
   },
   {
+    name: 'Caso Bob (Poodle Macho)',
     input: 'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
     expected: {
       spoken_order_index: 11,
@@ -54,6 +76,7 @@ const testCases: TestCase[] = [
     }
   },
   {
+    name: 'Caso Mel (Cadela Pitbull Chipada)',
     input: 'Paciente 3 cadela Pitbull Mel 18kg 3 anos Microchip 982000456 Propofol Isoflurano Meloxicam Dipirona OSH',
     expected: {
       spoken_order_index: 3,
@@ -70,6 +93,7 @@ const testCases: TestCase[] = [
     }
   },
   {
+    name: 'Caso Thor (Gato Siamês c/ Hipotermia)',
     input: 'Gato macho siamês Thor 4kg 2 anos quetamina e xilazina pós agemoxi e meloxicam com intercorrência hipotermia',
     expected: {
       species: 'FEL',
@@ -90,7 +114,8 @@ let passed = 0;
 for (let i = 0; i < testCases.length; i++) {
   const tc = testCases[i];
   const result = parseWithRegex(tc.input);
-  console.log(`\n[Teste #${i + 1}] Frase: "${tc.input}"`);
+  console.log(`\n[Teste #${i + 1}] ${tc.name}`);
+  console.log(`Frase: "${tc.input}"`);
 
   let ok = true;
   for (const key of Object.keys(tc.expected) as (keyof ParsedVoiceResult)[]) {
@@ -109,7 +134,7 @@ for (let i = 0; i < testCases.length; i++) {
   }
 
   if (ok) {
-    console.log(`✅ Teste #${i + 1} APROVADO com 100% de precisão!`);
+    console.log(`✅ [${tc.name}] APROVADO com 100% de precisão!`);
     passed++;
   }
 }

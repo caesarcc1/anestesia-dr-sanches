@@ -103,9 +103,9 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
 
   // 9. Procedimento
   let procedure_type: ProcedureType = sex === 'F' ? 'OSH' : 'ORQ';
-  if (lower.includes('procedimento 1') || lower.includes('procedimento um') || lower.includes('orquiectomia') || lower.includes('orquio') || lower.includes('castração de macho')) {
+  if (lower.includes('procedimento 1') || lower.includes('procedimento um') || lower.includes('orquiectomia') || lower.includes('orquio') || lower.includes('orqui') || lower.match(/\borq\b/) || lower.includes('castração de macho')) {
     procedure_type = 'ORQ';
-  } else if (lower.includes('procedimento 2') || lower.includes('procedimento dois') || lower.includes('osh') || lower.includes('ovario') || lower.includes('castração de fêmea')) {
+  } else if (lower.includes('procedimento 2') || lower.includes('procedimento dois') || lower.match(/\bosh\b/) || lower.includes('ovario') || lower.includes('castração de fêmea')) {
     procedure_type = 'OSH';
   } else if (lower.includes('procedimento 3') || lower.includes('procedimento três') || lower.includes('procedimento tres') || lower.includes('outros') || lower.includes('nodulectomia') || lower.includes('tartarectomia')) {
     procedure_type = 'OUTROS';
@@ -114,7 +114,7 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
   // 10. Fármacos anestésicos
   const anesthesia_drugs: AnesthesiaDrugCode[] = [];
   if (lower.includes('propofol') || lower.includes('propo')) anesthesia_drugs.push('P');
-  if (lower.includes('isoflurano') || lower.includes('iso') || lower.includes('inalatória')) anesthesia_drugs.push('I');
+  if (lower.includes('isoflurano') || lower.match(/\biso\b/) || lower.includes('inalatória')) anesthesia_drugs.push('I');
   if (lower.includes('quetamina') || lower.includes('ketamina') || lower.includes('queta') || lower.includes('quieta') || lower.includes('quita') || lower.includes('keta')) anesthesia_drugs.push('K');
   if (lower.includes('xilazina') || lower.includes('xila')) anesthesia_drugs.push('X');
   if (lower.includes('tramadol') || lower.includes('tramal')) anesthesia_drugs.push('T');
@@ -125,11 +125,15 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
   const post_meds: PostMedCode[] = [];
   if (lower.includes('agemoxi') || lower.includes('amoxicilina') || lower.includes('antibiótico')) post_meds.push('A');
   if (lower.includes('meloxicam') || lower.includes('melox') || lower.includes('anti-inflamatório')) post_meds.push('M');
-  if (lower.includes('dipirona') || lower.includes('analgésico')) post_meds.push('D');
+  if (lower.includes('dipirona') || lower.includes('dipi') || lower.includes('analgésico')) post_meds.push('D');
 
   // 12. Intercorrências
   let has_complication = false;
   let complication_notes: string | undefined;
+
+  // Extrair bloco de intercorrência primeiro (ex: "Intercorrência: Pequena bradicardia no início")
+  const complicationBlockMatch = text.match(/[Ii]ntercorr[êe]ncia[:\s]+(.+?)(?:\.|$)/);
+
   if (
     lower.includes('intercorrência') ||
     lower.includes('complicação') ||
@@ -137,11 +141,14 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     lower.includes('bradicardia') ||
     lower.includes('parada') ||
     lower.includes('hemorragia') ||
-    lower.includes('sangramento')
+    lower.includes('sangramento') ||
+    lower.includes('apneia') ||
+    lower.includes('taquicardia') ||
+    lower.includes('cianose')
   ) {
     if (!lower.includes('sem intercorrência') && !lower.includes('sem complicação') && !lower.includes('sem intercorrencia')) {
       has_complication = true;
-      complication_notes = text;
+      complication_notes = complicationBlockMatch ? complicationBlockMatch[1].trim() : text;
     }
   }
 
@@ -164,3 +171,4 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     confidence_summary: 'Processado com sucesso',
   };
 }
+

@@ -98,7 +98,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     lower.includes('canin') || lower.includes('cão') || lower.includes('cao') ||
     lower.includes('cachorr') || lower.includes('cadela') || lower.includes('poodle') ||
     lower.includes('pitbull') || lower.includes('galgo') || lower.includes('pastor') ||
-    lower.includes('pinscher') || lower.includes('shih') || lower.includes('rottweiler')
+    lower.includes('pinscher') || lower.includes('pincher') || lower.includes('shih') || lower.includes('rottweiler')
   ) {
     species = 'CAN';
   }
@@ -113,7 +113,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
 
   // 4. Peso (ex: "24kg", "12 quilos", "2.5 kg", "3.5kg", "42kg", "peso 24", "peso de 24")
   let weight_kg: number | undefined;
-  const weightWithUnitMatch = lower.match(/(\d+([.,]\d+)?)\s*(?:kg|quilos?|kilos?)/i);
+  const weightWithUnitMatch = lower.match(/(\d+([.,]\d+)?)\s*(?:kg|quilos?|kilos?|quilo)/i);
   if (weightWithUnitMatch) {
     weight_kg = parseFloat(weightWithUnitMatch[1].replace(',', '.'));
   } else {
@@ -137,17 +137,34 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     microchip = chipMatch[1].replace(/[^0-9a-zA-Z]/g, '');
   }
 
-  // 7. Raça
+  // 7. Raça (com mapeamento fonético para variações de voz)
   let breed = 'SRD';
-  const knownBreeds = [
-    'Galgo Italiano', 'Galgo', 'Pitbull', 'Pit bull', 'Poodle', 'Bulldog', 'Pinscher',
-    'Shih Tzu', 'Shihtzu', 'Lhasa', 'Pastor Alemão', 'Pastor', 'Labrador', 'Golden Retriever', 'Golden',
-    'Rottweiler', 'Dachshund', 'Border Collie', 'Beagle', 'Chihuahua', 'Spitz',
-    'Siamês', 'Siames', 'Persa', 'Angorá', 'Angora', 'Maine Coon', 'SRD', 'Vira-lata'
+  const breedMappings: [RegExp, string][] = [
+    [/\b(galgo\s+italiano|galgo)\b/i, 'Galgo Italiano'],
+    [/\b(pitbull|pit\s+bull|pit\s+bul)\b/i, 'Pitbull'],
+    [/\b(poodle|pudle|pudol)\b/i, 'Poodle'],
+    [/\b(pinscher|pincher|pinsher|pícher|pincer|esquilos|esquilo)\b/i, 'Pinscher'],
+    [/\b(shih\s+tzu|shihtzu|shitzu|shit\s+zu)\b/i, 'Shih Tzu'],
+    [/\b(rottweiler|rotweiler|rotvailer|rotevaile|rot)\b/i, 'Rottweiler'],
+    [/\b(pastor\s+alemão|pastor\s+alemao|pastor)\b/i, 'Pastor Alemão'],
+    [/\b(labrador|labradol)\b/i, 'Labrador'],
+    [/\b(golden\s+retriever|golden)\b/i, 'Golden Retriever'],
+    [/\b(siamês|siames)\b/i, 'Siamês'],
+    [/\b(persa)\b/i, 'Persa'],
+    [/\b(bulldog|buldogue|buldog)\b/i, 'Bulldog'],
+    [/\b(dachshund|teckel|salsicha)\b/i, 'Dachshund'],
+    [/\b(border\s+collie|border)\b/i, 'Border Collie'],
+    [/\b(beagle|bigol)\b/i, 'Beagle'],
+    [/\b(chihuahua|chiuaua)\b/i, 'Chihuahua'],
+    [/\b(spitz|lulu\s+da\s+pomerânia|lulu\s+da\s+pomerania)\b/i, 'Spitz'],
+    [/\b(angorá|angora)\b/i, 'Angorá'],
+    [/\b(maine\s+coon)\b/i, 'Maine Coon'],
+    [/\b(srd|vira[- ]lata|sem\s+raça\s+definida|sem\s+raca\s+definida)\b/i, 'SRD'],
   ];
-  for (const b of knownBreeds) {
-    if (lower.includes(b.toLowerCase())) {
-      breed = b;
+
+  for (const [pattern, bName] of breedMappings) {
+    if (pattern.test(lower)) {
+      breed = bName;
       break;
     }
   }
@@ -157,9 +174,9 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
   const blacklistWords = [
     'macho', 'femea', 'fêmea', 'canino', 'felino', 'cão', 'cao', 'cadela', 'gato', 'gata',
     'pitbull', 'poodle', 'srd', 'galgo', 'italiano', 'rottweiler', 'pinscher', 'persa', 'siames', 'siamês',
-    'anos', 'quilos', 'kg', 'animal', 'paciente', 'de', 'do', 'da', 'com', 'sem', 'propofol', 'propo',
-    'queta', 'quieta', 'quetamina', 'xilazina', 'mochila', 'axila', 'tramadol', 'tramal', 'meloxicam',
-    'melox', 'dipirona', 'dipi', 'agemoxi', 'procedimento', 'osh', 'orq', 'castracao', 'castração',
+    'esquilos', 'esquilo', 'anos', 'quilos', 'kg', 'animal', 'paciente', 'de', 'do', 'da', 'com', 'sem',
+    'propofol', 'propo', 'queta', 'quieta', 'quetamina', 'xilazina', 'mochila', 'axila', 'tramadol', 'tramal',
+    'meloxicam', 'melox', 'dipirona', 'dipi', 'agemoxi', 'procedimento', 'osh', 'orq', 'castracao', 'castração',
     'outros', 'pós', 'pos', 'anestesia', 'machi', 'feito', 'microchip', 'chip', 'intercorrencia',
     'intercorrência', 'intercorrências', 'observacao', 'observação', 'obs'
   ];
@@ -192,7 +209,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     }
   }
 
-  // Regra 3: Palavra imediatamente anterior ao peso ou idade (ex: "Zeus 42kg", "Luna 3.5kg", "Bento 6kg")
+  // Regra 3: Palavra imediatamente anterior ao peso ou idade (ex: "Zeus 42kg", "Luna 3.5kg", "Bento 6kg", "Spike 3kg")
   if (patient_name === 'Paciente') {
     const beforeWeightRegex = /(?:^|[,\s])([A-Za-zÀ-ÿ]{2,15})[,.\s]+(?:\d+(?:[.,]\d+)?\s*(?:kg|quilos?|kilos?|anos?|meses))/i;
     const match = text.match(beforeWeightRegex);
@@ -206,7 +223,8 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
 
   // Regra 4: Palavra logo após a raça (Ex: "persa Luna", "Shih Tzu Bento", "srd princesa" ou "poodle Bob")
   if (patient_name === 'Paciente') {
-    const breedFollowerRegex = new RegExp(`(?:${knownBreeds.join('|')})[,\\s]+([A-Za-zÀ-ÿ]+)`, 'i');
+    const knownBreedsNames = ['Galgo Italiano', 'Pitbull', 'Poodle', 'Pinscher', 'Shih Tzu', 'Rottweiler', 'Pastor Alemão', 'Labrador', 'Golden Retriever', 'Siamês', 'Persa', 'Bulldog', 'Dachshund', 'Border Collie', 'Beagle', 'Chihuahua', 'Spitz', 'Angorá', 'Maine Coon', 'SRD'];
+    const breedFollowerRegex = new RegExp(`(?:${knownBreedsNames.join('|')})[,\\s]+([A-Za-zÀ-ÿ]+)`, 'i');
     const breedFollowerMatch = text.match(breedFollowerRegex);
     if (breedFollowerMatch && breedFollowerMatch[1] && !blacklistWords.includes(breedFollowerMatch[1].toLowerCase()) && breedFollowerMatch[1].length > 1) {
       patient_name = breedFollowerMatch[1].charAt(0).toUpperCase() + breedFollowerMatch[1].slice(1).toLowerCase();
@@ -240,15 +258,25 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
   const anesthesia_drugs: AnesthesiaDrugCode[] = [];
 
   // Propofol
-  if (lower.includes('propofol') || lower.includes('propo') || lower.includes('propô') || lower.includes('propa') || lower.includes('propol')) {
+  if (
+    lower.includes('propofol') || lower.includes('propo') || lower.includes('propô') ||
+    lower.includes('propa') || lower.includes('propol') || lower.includes('o sol') ||
+    lower.match(/\bsol\b/) || lower.includes('pro sol')
+  ) {
     anesthesia_drugs.push('P');
   }
   // Isoflurano
-  if (lower.includes('isoflurano') || lower.includes('isoflorano') || lower.match(/\biso\b/) || lower.includes('inalatória') || lower.includes('inalatoria')) {
+  if (
+    lower.includes('isoflurano') || lower.includes('isoflorano') || lower.match(/\biso\b/) ||
+    lower.includes('inalatória') || lower.includes('inalatoria')
+  ) {
     anesthesia_drugs.push('I');
   }
   // Quetamina
-  if (lower.includes('quetamina') || lower.includes('ketamina') || lower.includes('queta') || lower.includes('quieta') || lower.includes('quita') || lower.includes('keta')) {
+  if (
+    lower.includes('quetamina') || lower.includes('ketamina') || lower.includes('queta') ||
+    lower.includes('quieta') || lower.includes('quita') || lower.includes('keta')
+  ) {
     anesthesia_drugs.push('K');
   }
   // Xilazina (inclui fonemas comuns como mochila, axila, chila, quila)
@@ -283,7 +311,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     post_meds.push('M');
   }
   // Dipirona
-  if (lower.includes('dipirona') || lower.includes('dipi') || lower.includes('analgésico') || lower.includes('analgesico')) {
+  if (lower.includes('dipirona') || lower.includes('dipi') || lower.includes('analgésico') || lower.includes('analgesico') || lower.includes('iso de pós')) {
     post_meds.push('D');
   }
 

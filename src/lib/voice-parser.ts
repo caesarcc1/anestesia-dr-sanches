@@ -1,7 +1,34 @@
 import { ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode } from '@/types';
 
+// Função ultra-robusta de desduplicação e limpeza de fala para eliminar loops do Android Chrome
+export function cleanAndDeduplicateSpeech(raw: string): string {
+  if (!raw) return '';
+  
+  // 1. Normaliza pontuação e espaços
+  let text = raw.replace(/\s+/g, ' ').trim();
+
+  // 2. Colapsa repetições consecutivas de blocos de palavras (de 5 até 1 palavra repetida)
+  for (let n = 6; n >= 1; n--) {
+    const pattern = new RegExp(`(\\b(?:\\w+[\\s,]+){${n - 1}}\\w+)(?:\\s*,?\\s*\\1)+`, 'gi');
+    text = text.replace(pattern, '$1');
+  }
+
+  // 3. Colapsa palavras adjacentes idênticas consecutivas (ex: "anos anos anos" -> "anos", "animal animal" -> "animal")
+  text = text.replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1');
+
+  // 4. Limpa padrões comuns de repetição fragmentada do mobile
+  text = text.replace(/(?:anos\s+microchip\s+)+/gi, 'anos microchip ');
+  text = text.replace(/(?:animal\s+\d+\s+)+/gi, (match) => {
+    const parts = match.trim().split(/\s+/);
+    return parts[parts.length - 2] + ' ' + parts[parts.length - 1] + ' ';
+  });
+
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 // Fallback rule-based parser in case no GEMINI_API_KEY is configured or model fails
-export function parseWithRegex(text: string): ParsedVoiceResult {
+export function parseWithRegex(rawText: string): ParsedVoiceResult {
+  const text = cleanAndDeduplicateSpeech(rawText);
   const lower = text.toLowerCase();
   
   // 1. Número do animal/paciente falado (ex: "animal 9", "animal 15", "paciente 14", "número 11")
@@ -18,7 +45,8 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
   } else if (
     lower.includes('canin') || lower.includes('cão') || lower.includes('cao') ||
     lower.includes('cachorr') || lower.includes('cadela') || lower.includes('poodle') ||
-    lower.includes('pitbull') || lower.includes('galgo') || lower.includes('pastor')
+    lower.includes('pitbull') || lower.includes('galgo') || lower.includes('pastor') ||
+    lower.includes('pinscher') || lower.includes('shih') || lower.includes('rottweiler')
   ) {
     species = 'CAN';
   }
@@ -31,7 +59,7 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     sex = 'M';
   }
 
-  // 4. Peso (ex: "24kg", "12 quilos", "2.5 kg", "peso 24", "peso de 24")
+  // 4. Peso (ex: "24kg", "12 quilos", "2.5 kg", "3.5kg", "peso 24", "peso de 24")
   let weight_kg: number | undefined;
   const weightWithUnitMatch = lower.match(/(\d+([.,]\d+)?)\s*(?:kg|quilos?|kilos?)/i);
   if (weightWithUnitMatch) {
@@ -43,7 +71,7 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     }
   }
 
-  // 5. Idade (ex: "5 anos", "1 ano", "6 meses")
+  // 5. Idade (ex: "5 anos", "1 ano", "8 meses", "6 meses")
   let age: string | undefined;
   const ageMatch = lower.match(/(\d+)\s*(anos?|meses|mês|ano)/i);
   if (ageMatch) {
@@ -52,18 +80,18 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
 
   // 6. Microchip
   let microchip: string | undefined;
-  const chipMatch = lower.match(/(?:microchip|chip|número\s+chip|numero\s+chip)\s*([0-9a-zA-Z]{5,18})/i);
+  const chipMatch = lower.match(/(?:microchip|chip|número\s+chip|numero\s+chip)\s*([0-9a-zA-Z-]{5,18})/i);
   if (chipMatch) {
-    microchip = chipMatch[1];
+    microchip = chipMatch[1].replace(/[^0-9a-zA-Z]/g, '');
   }
 
   // 7. Raça
   let breed = 'SRD';
   const knownBreeds = [
-    'Galgo Italiano', 'Galgo', 'Pitbull', 'Poodle', 'Bulldog', 'Pinscher',
-    'Shih Tzu', 'Lhasa', 'Pastor Alemão', 'Pastor', 'Labrador', 'Golden Retriever', 'Golden',
+    'Galgo Italiano', 'Galgo', 'Pitbull', 'Pit bull', 'Poodle', 'Bulldog', 'Pinscher',
+    'Shih Tzu', 'Shihtzu', 'Lhasa', 'Pastor Alemão', 'Pastor', 'Labrador', 'Golden Retriever', 'Golden',
     'Rottweiler', 'Dachshund', 'Border Collie', 'Beagle', 'Chihuahua', 'Spitz',
-    'Siamês', 'Persa', 'Angorá', 'Maine Coon', 'SRD', 'Vira-lata'
+    'Siamês', 'Siames', 'Persa', 'Angorá', 'Angora', 'Maine Coon', 'SRD', 'Vira-lata'
   ];
   for (const b of knownBreeds) {
     if (lower.includes(b.toLowerCase())) {
@@ -79,7 +107,7 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     'pitbull', 'poodle', 'srd', 'galgo', 'italiano', 'anos', 'quilos', 'kg', 'animal', 'paciente',
     'de', 'do', 'da', 'com', 'sem', 'propofol', 'propo', 'queta', 'quieta', 'quetamina', 'xilazina',
     'tramadol', 'meloxicam', 'dipirona', 'agemoxi', 'procedimento', 'osh', 'orq', 'castracao',
-    'castração', 'outros', 'pós', 'pos', 'anestesia', 'machi', 'feito'
+    'castração', 'outros', 'pós', 'pos', 'anestesia', 'machi', 'feito', 'microchip', 'chip', 'intercorrencia', 'intercorrência'
   ];
 
   // Regra A: "nome [Nome]" ou "de nome [Nome]" (Ex: "nome Miguel" -> Miguel)
@@ -92,7 +120,7 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     }
   }
 
-  // Regra B: Palavra logo após a raça (Ex: "srd princesa" ou "poodle Bob")
+  // Regra B: Palavra logo após a raça (Ex: "persa Luna", "Shih Tzu Bento", "srd princesa" ou "poodle Bob")
   if (patient_name === 'Paciente') {
     const breedFollowerRegex = new RegExp(`(?:${knownBreeds.join('|')})[,\\s]+([A-Za-zÀ-ÿ]+)`, 'i');
     const breedFollowerMatch = text.match(breedFollowerRegex);
@@ -178,4 +206,3 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     confidence_summary: 'Processado com sucesso',
   };
 }
-

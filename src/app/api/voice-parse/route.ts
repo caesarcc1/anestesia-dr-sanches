@@ -82,7 +82,7 @@ REGRAS:
 
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);
-      const modelCandidates = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+      const modelCandidates = ['gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 
       for (const modelName of modelCandidates) {
         try {
@@ -104,12 +104,12 @@ REGRAS:
                   data: audioBase64,
                 },
               },
-              'Transcreva o áudio e extraia os campos no JSON estruturado.',
+              'Transcreva o áudio e extraia rigorosamente os campos clínicos no JSON estruturado.',
             ]);
           } else {
             result = await model.generateContent([
               systemPrompt,
-              `Texto falado: "${transcriptText}". Extraia os campos no JSON.`,
+              `Texto falado: "${transcriptText}". Extraia com precisão clínica todos os campos no JSON.`,
             ]);
           }
 

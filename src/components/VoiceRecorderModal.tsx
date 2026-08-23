@@ -56,7 +56,7 @@ export function VoiceRecorderModal({
   const recognitionRef = useRef<any>(null);
   const isRecordingRef = useRef(false);
   const finalizedSegmentsRef = useRef<string[]>([]);
-  const currentSegmentRef = useRef<string>('');
+  const liveTranscriptRef = useRef('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const nextDefaultOrder = existingRecords.length + 1;
@@ -121,7 +121,7 @@ export function VoiceRecorderModal({
     setIsProcessing(false);
     setLiveTranscript('');
     finalizedSegmentsRef.current = [];
-    currentSegmentRef.current = '';
+    liveTranscriptRef.current = '';
     setManualInputText('');
     setShowTextInput(false);
     setParsedResult(null);
@@ -177,7 +177,7 @@ export function VoiceRecorderModal({
     setErrorMsg(null);
     setLiveTranscript('');
     finalizedSegmentsRef.current = [];
-    currentSegmentRef.current = '';
+    liveTranscriptRef.current = '';
     setParsedResult(null);
 
     const SpeechRecognition = typeof window !== 'undefined'
@@ -198,15 +198,26 @@ export function VoiceRecorderModal({
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (event: any) => {
-        let full = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          full += event.results[i][0].transcript + ' ';
+        let finalChunk = '';
+        let interimChunk = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const res = event.results[i];
+          if (res.isFinal) {
+            finalChunk += res[0].transcript + ' ';
+          } else {
+            interimChunk = res[0].transcript;
+          }
         }
-        currentSegmentRef.current = full.trim();
-        const allParts = [...finalizedSegmentsRef.current, currentSegmentRef.current];
-        const combined = allParts.filter(Boolean).join(' ');
-        const cleaned = cleanAndDeduplicateSpeech(combined);
-        setLiveTranscript(cleaned);
+
+        if (finalChunk) {
+          finalizedSegmentsRef.current.push(finalChunk.trim());
+        }
+
+        const allFinal = finalizedSegmentsRef.current.filter(Boolean).join(' ');
+        const currentCombined = (allFinal + ' ' + interimChunk).trim();
+        setLiveTranscript(currentCombined);
+        liveTranscriptRef.current = currentCombined;
       };
 
       recognition.onerror = (e: any) => {
@@ -217,10 +228,6 @@ export function VoiceRecorderModal({
       };
 
       recognition.onend = () => {
-        if (currentSegmentRef.current) {
-          finalizedSegmentsRef.current.push(currentSegmentRef.current);
-          currentSegmentRef.current = '';
-        }
         if (isRecordingRef.current) {
           try {
             recognition.start();
@@ -264,9 +271,7 @@ export function VoiceRecorderModal({
 
     // Aguarda 400ms para que o último buffer de fala do navegador finalize
     setTimeout(() => {
-      const allParts = [...finalizedSegmentsRef.current, currentSegmentRef.current];
-      const combined = allParts.filter(Boolean).join(' ');
-      const textToParse = cleanAndDeduplicateSpeech(combined.trim());
+      const textToParse = (liveTranscriptRef.current || finalizedSegmentsRef.current.join(' ')).trim();
 
       if (textToParse && textToParse.length > 2) {
         handleProcessText(textToParse);
@@ -369,7 +374,7 @@ export function VoiceRecorderModal({
                   Cadastro por Comando de Voz
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  v2.2.0
+                  v2.3.0
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">

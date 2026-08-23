@@ -194,7 +194,7 @@ export function VoiceRecorderModal({
       const recognition = new SpeechRecognition();
       recognition.lang = 'pt-BR';
       recognition.continuous = true;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
       recognition.onresult = (event: any) => {
@@ -406,14 +406,29 @@ export function VoiceRecorderModal({
                     <div className="w-2 bg-rose-500 rounded-full animate-pulse h-8" />
                   </div>
                   
-                  <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center">
-                    <p className="text-xs sm:text-sm font-bold text-rose-700 dark:text-rose-300">
-                      🎙️ Gravando áudio ({recordingTime}s)...
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Fale todos os dados do paciente com calma e toque no botão abaixo ao terminar.
-                    </p>
-                  </div>
+                  {liveTranscript ? (
+                    <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-left text-xs space-y-1">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-300 text-[11px]">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        Ouvindo e captando ao vivo:
+                      </div>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">
+                        "{liveTranscript}"
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-center">
+                      <p className="text-xs sm:text-sm font-bold text-rose-700 dark:text-rose-300">
+                        🎙️ Gravando áudio ({recordingTime}s)...
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        Fale todos os dados do paciente com calma e toque no botão abaixo ao terminar.
+                      </p>
+                    </div>
+                  )}
 
                   <button
                     type="button"

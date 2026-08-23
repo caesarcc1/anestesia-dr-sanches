@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { AnesthesiaRecord, ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode, ANESTHESIA_DRUGS, POST_MEDS } from '@/types';
-import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight, Type, Edit3, CheckCircle2, Waves } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight, Type, Edit3, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface VoiceRecorderModalProps {
@@ -46,9 +46,15 @@ export function VoiceRecorderModal({
   const [observations, setObservations] = useState('');
   const [orderIndex, setOrderIndex] = useState<number>(1);
   const [orderWarning, setOrderWarning] = useState<string | null>(null);
+  const [spokenNumberOverride, setSpokenNumberOverride] = useState<number | null>(null);
+
+  // Editable raw transcript box
+  const [rawEditableText, setRawEditableText] = useState('');
+  const [showTranscriptEditor, setShowTranscriptEditor] = useState(true);
 
   const recognitionRef = useRef<any>(null);
   const isRecordingRef = useRef(false);
+  const finalTranscriptRef = useRef('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const liveTranscriptRef = useRef('');
 
@@ -94,16 +100,20 @@ export function VoiceRecorderModal({
     setIsProcessing(false);
     setLiveTranscript('');
     liveTranscriptRef.current = '';
+    finalTranscriptRef.current = '';
     setManualInputText('');
     setShowTextInput(false);
     setParsedResult(null);
     setErrorMsg(null);
     setOrderWarning(null);
+    setSpokenNumberOverride(null);
+    setRawEditableText('');
   };
 
   // Preenche todos os campos editáveis a partir do resultado retornado
   const populateEditableFields = (data: ParsedVoiceResult) => {
     setParsedResult(data);
+    setRawEditableText(data.raw_transcription || liveTranscriptRef.current || '');
     setPatientName(data.patient_name || 'Paciente');
     setBreed(data.breed || 'SRD');
     setSpecies(data.species || 'CAN');
@@ -119,29 +129,26 @@ export function VoiceRecorderModal({
     setComplicationNotes(data.complication_notes || '');
     setObservations(data.observations || '');
 
-    // Validação inteligente de numeração do paciente
+    // Numeração Inteligente: se falou errado/pulou, preenche com o correto da fila e dá opção de usar o falado
     if (data.spoken_order_index !== undefined && data.spoken_order_index !== null && data.spoken_order_index > 0) {
       const spokenNum = data.spoken_order_index;
       const alreadyExists = existingRecords.some(r => r.order_index === spokenNum);
 
-      // Mantém o número falado no input
-      setOrderIndex(spokenNum);
-
-      if (alreadyExists) {
-        const existingRecord = existingRecords.find(r => r.order_index === spokenNum);
+      if (alreadyExists || spokenNum > nextDefaultOrder) {
+        setOrderIndex(nextDefaultOrder);
+        setSpokenNumberOverride(spokenNum);
         setOrderWarning(
-          `⚠️ Você falou Animal #${spokenNum}, mas o #${spokenNum} (${existingRecord?.patient_name || 'já registrado'}) já existe na ficha de hoje. O próximo sequencial livre é #${nextDefaultOrder}.`
-        );
-      } else if (spokenNum > nextDefaultOrder) {
-        setOrderWarning(
-          `⚠️ Você falou Animal #${spokenNum}, mas o próximo na sequência de hoje seria #${nextDefaultOrder} (pulou ${spokenNum - nextDefaultOrder} posições). Deseja manter #${spokenNum} ou ajustar para #${nextDefaultOrder}?`
+          `ℹ️ Número ajustado automaticamente para o próximo da fila (#${nextDefaultOrder}). Você falou "#${spokenNum}".`
         );
       } else {
+        setOrderIndex(spokenNum);
         setOrderWarning(null);
+        setSpokenNumberOverride(null);
       }
     } else {
       setOrderIndex(nextDefaultOrder);
       setOrderWarning(null);
+      setSpokenNumberOverride(null);
     }
   };
 
@@ -149,6 +156,7 @@ export function VoiceRecorderModal({
     setErrorMsg(null);
     setLiveTranscript('');
     liveTranscriptRef.current = '';
+    finalTranscriptRef.current = '';
     setParsedResult(null);
 
     const SpeechRecognition = typeof window !== 'undefined'
@@ -156,7 +164,7 @@ export function VoiceRecorderModal({
       : null;
 
     if (!SpeechRecognition) {
-      setErrorMsg('O seu navegador não suporta reconhecimento de voz direto. Você pode usar os exemplos abaixo ou digitar a frase.');
+      setErrorMsg('O seu navegador não possui reconhecimento de voz direto. Use os botões de exemplo ou digite a frase.');
       setShowTextInput(true);
       return;
     }
@@ -168,27 +176,32 @@ export function VoiceRecorderModal({
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
+      // Solução definitiva para a duplicação no Chrome Android: usar resultIndex!
       recognition.onresult = (event: any) => {
-        let full = '';
-        for (let i = 0; i < event.results.length; i++) {
-          full += event.results[i][0].transcript + ' ';
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const piece = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscriptRef.current += piece + ' ';
+          } else {
+            interim += piece;
+          }
         }
-        const trimmed = full.trim();
-        if (trimmed) {
-          setLiveTranscript(trimmed);
-          liveTranscriptRef.current = trimmed;
+        const currentFull = (finalTranscriptRef.current + interim).trim();
+        if (currentFull) {
+          setLiveTranscript(currentFull);
+          liveTranscriptRef.current = currentFull;
         }
       };
 
       recognition.onerror = (e: any) => {
         console.warn('SpeechRecognition erro:', e.error);
         if (e.error === 'not-allowed') {
-          setErrorMsg('Acesso ao microfone negado. Por favor, permita o microfone no cadeado do navegador.');
+          setErrorMsg('Microfone bloqueado. Por favor, libere a permissão de microfone no navegador.');
         }
       };
 
       recognition.onend = () => {
-        // Se ainda estiver no modo de gravação no mobile, reativa automaticamente
         if (isRecordingRef.current) {
           try {
             recognition.start();
@@ -206,8 +219,8 @@ export function VoiceRecorderModal({
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      console.warn('Falha ao iniciar SpeechRecognition:', err);
-      setErrorMsg('Não foi possível ativar o microfone. Tente novamente ou use a digitação rápida.');
+      console.warn('Falha ao iniciar microfone:', err);
+      setErrorMsg('Não foi possível ligar o microfone. Tente novamente ou digite a frase.');
       setShowTextInput(true);
     }
   };
@@ -232,7 +245,7 @@ export function VoiceRecorderModal({
     if (textToParse && textToParse.length > 2) {
       handleProcessText(textToParse);
     } else {
-      setErrorMsg('Nenhuma fala foi capturada. Fale mais perto do microfone ou use os botões rápidos.');
+      setErrorMsg('Nenhuma fala detectada. Fale mais perto do microfone ou use os exemplos rápidos.');
     }
   };
 
@@ -328,7 +341,7 @@ export function VoiceRecorderModal({
                   Cadastro por Comando de Voz
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                  v1.6.0
+                  v1.7.0
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -389,7 +402,7 @@ export function VoiceRecorderModal({
                   <div className="space-y-2">
                     <p className="text-sm font-bold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1.5 animate-pulse">
                       <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block" />
-                      Ouvindo ({recordingTime}s)... Fale naturalmente e toque em Concluir
+                      Ouvindo ({recordingTime}s)... Fale e toque em Concluir
                     </p>
                     <div className="p-3.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border-2 border-emerald-300 dark:border-emerald-700 min-h-[55px] text-xs text-emerald-950 dark:text-emerald-100 font-medium text-left">
                       {liveTranscript ? (
@@ -405,7 +418,7 @@ export function VoiceRecorderModal({
                   </p>
                 ) : (
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                    Toque no microfone e fale os dados do animal com suas palavras ou abreviações usuais.
+                    Toque no microfone e fale os dados do animal com suas palavras usuais.
                   </p>
                 )}
               </div>
@@ -455,8 +468,8 @@ export function VoiceRecorderModal({
 
               {/* 5 Exemplos Clínicos Reais para Teste com 1 Toque */}
               <div className="w-full pt-2 text-left">
-                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>💡 5 Frases de Teste Prontas (1 Toque):</span>
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                  💡 5 Frases de Teste Prontas (1 Toque):
                 </div>
                 <div className="space-y-2">
                   {SAMPLE_VOICE_PROMPTS.map((prompt, idx) => (
@@ -491,7 +504,7 @@ export function VoiceRecorderModal({
               <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Conferência & Edição Rápida (Ajuste qualquer campo abaixo)
+                  Conferência & Edição Rápida
                 </div>
                 <button
                   onClick={() => setParsedResult(null)}
@@ -501,32 +514,72 @@ export function VoiceRecorderModal({
                 </button>
               </div>
 
-              {/* Order index conflict warning */}
+              {/* Box da Frase Transcrita com Opção de Editar e Reprocessar com IA */}
+              <div className="p-3 rounded-2xl bg-sky-50/80 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-800 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
+                    <Edit3 className="w-3.5 h-3.5 text-sky-600" />
+                    Frase Ouvida pelo Sistema (Edite para ajustar se necessário):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowTranscriptEditor(!showTranscriptEditor)}
+                    className="text-sky-700 dark:text-sky-300 hover:underline text-[11px]"
+                  >
+                    {showTranscriptEditor ? 'Recolher' : 'Expandir'}
+                  </button>
+                </div>
+
+                {showTranscriptEditor && (
+                  <div className="space-y-2 pt-1">
+                    <textarea
+                      rows={2}
+                      value={rawEditableText}
+                      onChange={e => setRawEditableText(e.target.value)}
+                      placeholder="Texto reconhecido..."
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-sky-300 dark:border-sky-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleProcessText(rawEditableText)}
+                      disabled={isProcessing || !rawEditableText.trim()}
+                      className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white font-bold rounded-xl text-xs shadow-xs flex items-center gap-1.5 transition-transform active:scale-95"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Reprocessar Frase com IA
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Order index conflict / auto-adjust alert */}
               {orderWarning && (
-                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs space-y-2.5 shadow-sm">
+                <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs space-y-2 shadow-sm">
                   <div className="flex items-start gap-2 font-medium">
                     <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                     <span>{orderWarning}</span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOrderIndex(nextDefaultOrder);
-                        setOrderWarning(null);
-                      }}
-                      className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-sm active:scale-95"
-                    >
-                      ⚡ Ajustar para Sequência (#{nextDefaultOrder})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOrderWarning(null)}
-                      className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold hover:bg-slate-100"
-                    >
-                      ✅ Manter #{orderIndex} (Confirmar)
-                    </button>
-                  </div>
+                  {spokenNumberOverride && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOrderIndex(spokenNumberOverride);
+                          setOrderWarning(null);
+                        }}
+                        className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-xs active:scale-95"
+                      >
+                        ↩️ Usar #{spokenNumberOverride} (número falado)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOrderWarning(null)}
+                        className="px-3 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold"
+                      >
+                        ✓ Manter #{orderIndex} (próximo da fila)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -820,7 +873,7 @@ export function VoiceRecorderModal({
                 {/* Observations */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                    Observações Gerais
+                    Observações Gerais (Opcional)
                   </label>
                   <input
                     type="text"

@@ -152,6 +152,13 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     }
   }
 
+  // 13. Observações clínicas específicas (ex: "obs: jejum ok", "observação: animal agitado")
+  let observations = '';
+  const obsMatch = text.match(/(?:observa[çc][ãa]o|obs|nota)[:\s]+(.+?)(?:\.|$)/i);
+  if (obsMatch && obsMatch[1]) {
+    observations = obsMatch[1].trim();
+  }
+
   return {
     spoken_order_index,
     species,
@@ -166,7 +173,7 @@ export function parseWithRegex(text: string): ParsedVoiceResult {
     post_meds: post_meds.length > 0 ? post_meds : ['M', 'D'],
     has_complication,
     complication_notes,
-    observations: text,
+    observations,
     raw_transcription: text,
     confidence_summary: 'Processado com sucesso',
   };

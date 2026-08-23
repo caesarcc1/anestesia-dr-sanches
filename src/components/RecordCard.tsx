@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AnesthesiaRecord, ANESTHESIA_DRUGS, POST_MEDS, PROCEDURES, AnesthesiaDrugCode, PostMedCode } from '@/types';
-import { Edit2, Trash2, AlertCircle, CheckCircle2, ShieldAlert, Dog, Cat } from 'lucide-react';
+import { Edit2, Trash2, ShieldAlert, Dog, Cat, Lock, Unlock } from 'lucide-react';
 
 interface RecordCardProps {
   record: AnesthesiaRecord;
@@ -19,6 +19,7 @@ export function RecordCard({
   onToggleDrug,
   onTogglePostMed,
 }: RecordCardProps) {
+  const [isUnlocked, setIsUnlocked] = useState(false);
   const isCanine = record.species === 'CAN';
   const isMale = record.sex === 'M';
 
@@ -100,18 +101,41 @@ export function RecordCard({
             </span>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-1">
+          {/* Action buttons (Lock/Unlock, Edit, Delete) */}
+          <div className="flex items-center gap-1 pt-0.5">
+            {/* Lock / Unlock Toggle Button */}
+            <button
+              onClick={() => setIsUnlocked(!isUnlocked)}
+              className={`px-2 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all ${
+                isUnlocked
+                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+              }`}
+              title={isUnlocked ? 'Travar botões para evitar alterações' : 'Destravar para editar fármacos diretamente no card'}
+            >
+              {isUnlocked ? (
+                <>
+                  <Unlock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                  <span className="text-[10px] font-bold">Destravado</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3 h-3 text-slate-400" />
+                  <span className="text-[10px]">Travado</span>
+                </>
+              )}
+            </button>
+
             <button
               onClick={() => onEdit(record)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Editar animal"
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Editar ficha completa"
             >
               <Edit2 className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onDelete(record.id)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
               title="Excluir animal"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -120,34 +144,66 @@ export function RecordCard({
         </div>
       </div>
 
-      {/* Drugs & Post-op Meds interactive quick-tap section */}
+      {/* Drugs & Post-op Meds section (Locked by default) */}
       <div className="p-3.5 sm:p-4 space-y-3">
         {/* Anesthesia Drugs */}
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
-            Fármacos Anestésicos (1-toque para alternar)
+          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+            <span>Fármacos Anestésicos</span>
+            {isUnlocked ? (
+              <span className="text-amber-600 dark:text-amber-400 font-bold normal-case text-[10px]">
+                Toque nos botões para marcar/desmarcar
+              </span>
+            ) : (
+              <span className="text-slate-400 normal-case text-[10px]">
+                🔒 Travado (toque em Destravar para alterar)
+              </span>
+            )}
           </div>
+
           <div className="flex flex-wrap gap-1.5">
             {ALL_DRUG_CODES.map(code => {
               const drug = ANESTHESIA_DRUGS[code];
               const isSelected = record.anesthesia_drugs.includes(code);
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => onToggleDrug(record, code)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all active:scale-95 flex items-center gap-1 ${
-                    isSelected
-                      ? `${drug.color} border-current shadow-xs font-bold`
-                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100'
-                  }`}
-                  title={`${drug.name} (${drug.category})`}
-                >
-                  <span className="font-bold">[{code}]</span>
-                  <span>{drug.shortName}</span>
-                </button>
-              );
+
+              if (isUnlocked) {
+                // Modo destravado: botões interativos para alternar
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => onToggleDrug(record, code)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all active:scale-95 flex items-center gap-1 ${
+                      isSelected
+                        ? `${drug.color} border-current shadow-xs font-bold ring-2 ring-blue-500/20`
+                        : 'bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100'
+                    }`}
+                    title={`${drug.name} (${drug.category})`}
+                  >
+                    <span className="font-bold">[{code}]</span>
+                    <span>{drug.shortName}</span>
+                  </button>
+                );
+              } else {
+                // Modo travado: exibe apenas os selecionados como selos protegidos
+                if (!isSelected) return null;
+                return (
+                  <span
+                    key={code}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center gap-1 ${drug.color} border-current shadow-xs`}
+                    title={`${drug.name} (${drug.category})`}
+                  >
+                    <span>[{code}]</span>
+                    <span>{drug.shortName}</span>
+                  </span>
+                );
+              }
             })}
+
+            {!isUnlocked && record.anesthesia_drugs.length === 0 && (
+              <span className="text-xs text-slate-400 italic">Nenhum anestésico marcado</span>
+            )}
+
             {record.anesthesia_others && (
               <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                 + {record.anesthesia_others}
@@ -158,30 +214,52 @@ export function RecordCard({
 
         {/* Post-Op Medications */}
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
-            Medicação Pós-Operatória
+          <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+            <span>Medicação Pós-Operatória</span>
           </div>
+
           <div className="flex flex-wrap gap-1.5">
             {ALL_POST_CODES.map(code => {
               const med = POST_MEDS[code];
               const isSelected = record.post_meds.includes(code);
-              return (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => onTogglePostMed(record, code)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all active:scale-95 flex items-center gap-1 ${
-                    isSelected
-                      ? `${med.color} border-current shadow-xs font-bold`
-                      : 'bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100'
-                  }`}
-                  title={med.name}
-                >
-                  <span className="font-bold">[{code}]</span>
-                  <span>{med.name}</span>
-                </button>
-              );
+
+              if (isUnlocked) {
+                // Modo destravado: botões interativos
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => onTogglePostMed(record, code)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all active:scale-95 flex items-center gap-1 ${
+                      isSelected
+                        ? `${med.color} border-current shadow-xs font-bold ring-2 ring-emerald-500/20`
+                        : 'bg-slate-50 dark:bg-slate-800/60 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800 opacity-60 hover:opacity-100'
+                    }`}
+                    title={med.name}
+                  >
+                    <span className="font-bold">[{code}]</span>
+                    <span>{med.name}</span>
+                  </button>
+                );
+              } else {
+                // Modo travado: selos limpos
+                if (!isSelected) return null;
+                return (
+                  <span
+                    key={code}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border flex items-center gap-1 ${med.color} border-current shadow-xs`}
+                    title={med.name}
+                  >
+                    <span>[{code}]</span>
+                    <span>{med.name}</span>
+                  </span>
+                );
+              }
             })}
+
+            {!isUnlocked && record.post_meds.length === 0 && (
+              <span className="text-xs text-slate-400 italic">Nenhum pós-operatório marcado</span>
+            )}
           </div>
         </div>
 

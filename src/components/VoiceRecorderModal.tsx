@@ -57,9 +57,9 @@ export function VoiceRecorderModal({
 
   // Exemplos rápidos para testes com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
-    'Animal 9, cão, de nome Lulu, 12 quilos, 3 anos, microchip 982000362, Propofol e Quetamina, pós Meloxicam e Dipirona, ORQ, sem intercorrências',
+    'Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Quetamina, Meloxicam de pós, Procedimento 1',
+    'Animal 9, cão, de nome Lulu, 12 quilos, 3 anos, microchip 982000362, Propofol e Quetamina, pós Meloxicam e Dipirona, ORQ',
     'Canino fêmea Pitbull Mel 18kg 3 anos microchip 982000456 Propofol Isoflurano Meloxicam Dipirona OSH sem intercorrências',
-    'Felino macho Siamês Mingau 4kg 1 ano Quetamina Xilazina Meloxicam ORQ tudo tranquilo',
   ];
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export function VoiceRecorderModal({
     setOrderWarning(null);
   };
 
-  // Quando o parser retorna resultado, preenchemos os estados editáveis
+  // Preenche todos os campos editáveis a partir do resultado retornado pela IA ou parser
   const populateEditableFields = (data: ParsedVoiceResult) => {
     setParsedResult(data);
     setPatientName(data.patient_name || 'Paciente');
@@ -123,7 +123,6 @@ export function VoiceRecorderModal({
         setOrderWarning(null);
       }
     } else {
-      // Se não falou nenhum número, atribui automaticamente o próximo sequencial
       setOrderIndex(nextDefaultOrder);
       setOrderWarning(null);
     }
@@ -136,7 +135,7 @@ export function VoiceRecorderModal({
     setParsedResult(null);
     audioChunksRef.current = [];
 
-    // 1. Inicia Web Speech Recognition no navegador
+    // 1. Inicia Web Speech Recognition no navegador (se disponível)
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
@@ -367,11 +366,16 @@ export function VoiceRecorderModal({
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">
-                Cadastro por Comando de Voz
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">
+                  Cadastro por Comando de Voz
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                  v1.3.0
+                </span>
+              </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Fale os dados do animal ou digite para preenchimento instantâneo
+                Fale os dados do animal ou use os botões rápidos
               </p>
             </div>
           </div>
@@ -444,7 +448,7 @@ export function VoiceRecorderModal({
                   </p>
                 ) : (
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xs">
-                    Ex: <span className="italic font-medium">"Animal 9, cão, de nome Lulu, 12 quilos, 3 anos, microchip 12345, Propofol e Queta OSH sem intercorrências"</span>
+                    Ex: <span className="italic font-medium">"Animal 11, Macho, Poodle, Bob, 12kg, Propofol e Queta, Meloxicam, Procedimento 1"</span>
                   </p>
                 )}
               </div>
@@ -472,7 +476,7 @@ export function VoiceRecorderModal({
                   <div className="mt-3 flex gap-2">
                     <input
                       type="text"
-                      placeholder="Ex: Animal 9 cão de nome Lulu 12kg Propofol ORQ..."
+                      placeholder="Ex: Animal 11 Macho Poodle Bob 12kg Propofol..."
                       value={manualInputText}
                       onChange={e => setManualInputText(e.target.value)}
                       onKeyDown={e => {
@@ -523,7 +527,7 @@ export function VoiceRecorderModal({
               <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  Dados Extraídos com Sucesso! (Você pode ajustar abaixo antes de salvar)
+                  Conferência & Edição Rápida (Ajuste qualquer campo abaixo)
                 </div>
                 <button
                   onClick={() => setParsedResult(null)}
@@ -587,7 +591,7 @@ export function VoiceRecorderModal({
                       type="text"
                       value={patientName}
                       onChange={e => setPatientName(e.target.value)}
-                      placeholder="Ex: Lulu, Thor..."
+                      placeholder="Ex: Lulu, Thor, Bob..."
                       className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-bold text-xs"
                     />
                   </div>
@@ -730,7 +734,7 @@ export function VoiceRecorderModal({
                       step="0.1"
                       value={weightKg}
                       onChange={e => setWeightKg(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                      placeholder="Ex: 12.5"
+                      placeholder="Ex: 12"
                       className="w-full px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-center font-bold text-xs"
                     />
                   </div>

@@ -48,11 +48,12 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
     doc.setFont('helvetica', 'bold');
     doc.text(`Pag: ${currentPageNum}`, 250, 18);
 
-    // Build 8 animal blocks (each block has 2 rows: data row + observations row)
+    // Build animal blocks (each block has 2 rows: data row + observations row)
     const tableBody: any[] = [];
+    const recordsToRender = pageRecords.length > 0 ? pageRecords : [null]; // 1 linha vazia se ficha estiver totalmente vazia
 
-    for (let i = 0; i < RECORDS_PER_PAGE; i++) {
-      const rec = pageRecords[i];
+    for (let i = 0; i < recordsToRender.length; i++) {
+      const rec = recordsToRender[i];
 
       if (rec) {
         // Format Species
@@ -115,7 +116,7 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
           obsText += rec.observations;
         }
         if (!rec.observations && !rec.has_complication) {
-          obsText += 'Sem intercorrências registradas.';
+          obsText += 'Sem intercorrências.';
         }
 
         tableBody.push([
@@ -131,7 +132,7 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
           },
         ]);
       } else {
-        // Blank row for printing / filling if under 8 records
+        // Blank row only if totally 0 records
         tableBody.push([
           { content: '' },
           { content: '(CAN) (FEL)', styles: { halign: 'center', textColor: [160, 160, 160] } },

@@ -69,6 +69,40 @@ export default function HomePage() {
     setActiveSession(updated);
   };
 
+  const handleNavigateDay = (offsetDays: number) => {
+    if (!activeSession) return;
+    const [year, month, day] = activeSession.session_date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    dateObj.setDate(dateObj.getDate() + offsetDays);
+
+    const newYear = dateObj.getFullYear();
+    const newMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const newDay = String(dateObj.getDate()).padStart(2, '0');
+    const newDateStr = `${newYear}-${newMonth}-${newDay}`;
+
+    const session = storage.getOrCreateSessionForDate(newDateStr);
+    const allSessions = storage.getSessions();
+    setSessions(allSessions);
+    setActiveSession(session);
+    const dayRecords = storage.getRecords(session.id);
+    setRecords(dayRecords);
+  };
+
+  const handleGoToToday = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
+    const session = storage.getOrCreateSessionForDate(todayStr);
+    const allSessions = storage.getSessions();
+    setSessions(allSessions);
+    setActiveSession(session);
+    const dayRecords = storage.getRecords(session.id);
+    setRecords(dayRecords);
+  };
+
   // Add parsed voice record to active session
   const handleConfirmVoiceRecord = (data: Partial<AnesthesiaRecord> & { order_index?: number }) => {
     if (!activeSession) return;
@@ -214,6 +248,8 @@ export default function HomePage() {
         }}
         onOpenPdfModal={() => setIsPdfModalOpen(true)}
         onOpenConfigModal={() => setIsConfigModalOpen(true)}
+        onNavigateDay={handleNavigateDay}
+        onGoToToday={handleGoToToday}
         currentView="records"
       />
 

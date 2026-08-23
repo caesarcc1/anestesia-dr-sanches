@@ -26,6 +26,50 @@ export default function HomePage() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<AnesthesiaRecord | null>(null);
 
+  // Toast para confirmação de saída do app no Android
+  const [backToast, setBackToast] = useState<string | null>(null);
+  const lastBackPressRef = React.useRef<number>(0);
+
+  // Monitora modais abertos e gerencia o botão Voltar do Android / Navegador
+  const anyModalOpen = isVoiceModalOpen || isManualModalOpen || isPdfModalOpen || isConfigModalOpen || !!editingRecord;
+
+  useEffect(() => {
+    if (anyModalOpen) {
+      window.history.pushState({ modalOpen: true }, '');
+    } else {
+      window.history.replaceState({ appRoot: true }, '');
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (isVoiceModalOpen) {
+        setIsVoiceModalOpen(false);
+      } else if (isManualModalOpen) {
+        setIsManualModalOpen(false);
+        setEditingRecord(null);
+      } else if (editingRecord) {
+        setEditingRecord(null);
+      } else if (isPdfModalOpen) {
+        setIsPdfModalOpen(false);
+      } else if (isConfigModalOpen) {
+        setIsConfigModalOpen(false);
+      } else {
+        // Na tela principal sem modais: previne saída acidental no 1º clique
+        const now = Date.now();
+        if (now - lastBackPressRef.current < 2000) {
+          window.history.back();
+        } else {
+          lastBackPressRef.current = now;
+          window.history.pushState({ appRoot: true }, '');
+          setBackToast('Pressione Voltar novamente para sair');
+          setTimeout(() => setBackToast(null), 2000);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [anyModalOpen, isVoiceModalOpen, isManualModalOpen, isPdfModalOpen, isConfigModalOpen, editingRecord]);
+
   // Load from local storage / Supabase on mount
   useEffect(() => {
     const loadedSessions = storage.getSessions();
@@ -442,6 +486,13 @@ export default function HomePage() {
         onUpdateSession={handleUpdateSession}
         onResetAllData={handleResetAllData}
       />
+
+      {/* Toast de confirmação para sair do app */}
+      {backToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-full bg-slate-900/90 text-white text-xs font-semibold shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 border border-slate-700 pointer-events-none">
+          {backToast}
+        </div>
+      )}
 
     </div>
   );

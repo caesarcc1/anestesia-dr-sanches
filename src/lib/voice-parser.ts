@@ -1,29 +1,12 @@
 import { ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode } from '@/types';
 
-// Função ultra-robusta de desduplicação e limpeza de fala para eliminar loops do Android Chrome
+// Função de desduplicação e limpeza de fala para eliminar repetições consecutivas
 export function cleanAndDeduplicateSpeech(raw: string): string {
   if (!raw) return '';
-  
-  // 1. Normaliza pontuação e espaços
   let text = raw.replace(/\s+/g, ' ').trim();
-
-  // 2. Colapsa repetições consecutivas de blocos de palavras (de 5 até 1 palavra repetida)
-  for (let n = 6; n >= 1; n--) {
-    const pattern = new RegExp(`(\\b(?:\\w+[\\s,]+){${n - 1}}\\w+)(?:\\s*,?\\s*\\1)+`, 'gi');
-    text = text.replace(pattern, '$1');
-  }
-
-  // 3. Colapsa palavras adjacentes idênticas consecutivas (ex: "anos anos anos" -> "anos", "animal animal" -> "animal")
-  text = text.replace(/\b(\w+)(?:\s+\1\b)+/gi, '$1');
-
-  // 4. Limpa padrões comuns de repetição fragmentada do mobile
-  text = text.replace(/(?:anos\s+microchip\s+)+/gi, 'anos microchip ');
-  text = text.replace(/(?:animal\s+\d+\s+)+/gi, (match) => {
-    const parts = match.trim().split(/\s+/);
-    return parts[parts.length - 2] + ' ' + parts[parts.length - 1] + ' ';
-  });
-
-  return text.replace(/\s+/g, ' ').trim();
+  // Colapsa apenas palavras inteiras com 3+ letras repetidas consecutivamente (ex: "anos anos" -> "anos", "macho macho" -> "macho")
+  text = text.replace(/\b([a-zA-ZÀ-ÿ]{3,})\s+\1\b/gi, '$1');
+  return text.trim();
 }
 
 // Fallback rule-based parser in case no GEMINI_API_KEY is configured or model fails
@@ -59,7 +42,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     sex = 'M';
   }
 
-  // 4. Peso (ex: "24kg", "12 quilos", "2.5 kg", "3.5kg", "peso 24", "peso de 24")
+  // 4. Peso (ex: "24kg", "12 quilos", "2.5 kg", "3.5kg", "42kg", "peso 24", "peso de 24")
   let weight_kg: number | undefined;
   const weightWithUnitMatch = lower.match(/(\d+([.,]\d+)?)\s*(?:kg|quilos?|kilos?)/i);
   if (weightWithUnitMatch) {
@@ -71,7 +54,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     }
   }
 
-  // 5. Idade (ex: "5 anos", "1 ano", "8 meses", "6 meses")
+  // 5. Idade (ex: "5 anos", "1 ano", "8 meses", "4 anos", "10 anos")
   let age: string | undefined;
   const ageMatch = lower.match(/(\d+)\s*(anos?|meses|mês|ano)/i);
   if (ageMatch) {
@@ -100,17 +83,19 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     }
   }
 
-  // 8. Nome do animal
+  // 8. Nome do animal (Multi-Estratégia Inteligente)
   let patient_name = 'Paciente';
   const blacklistWords = [
     'macho', 'femea', 'fêmea', 'canino', 'felino', 'cão', 'cao', 'cadela', 'gato', 'gata',
-    'pitbull', 'poodle', 'srd', 'galgo', 'italiano', 'anos', 'quilos', 'kg', 'animal', 'paciente',
-    'de', 'do', 'da', 'com', 'sem', 'propofol', 'propo', 'queta', 'quieta', 'quetamina', 'xilazina',
-    'tramadol', 'meloxicam', 'dipirona', 'agemoxi', 'procedimento', 'osh', 'orq', 'castracao',
-    'castração', 'outros', 'pós', 'pos', 'anestesia', 'machi', 'feito', 'microchip', 'chip', 'intercorrencia', 'intercorrência'
+    'pitbull', 'poodle', 'srd', 'galgo', 'italiano', 'rottweiler', 'pinscher', 'persa', 'siames', 'siamês',
+    'anos', 'quilos', 'kg', 'animal', 'paciente', 'de', 'do', 'da', 'com', 'sem', 'propofol', 'propo',
+    'queta', 'quieta', 'quetamina', 'xilazina', 'mochila', 'axila', 'tramadol', 'tramal', 'meloxicam',
+    'melox', 'dipirona', 'dipi', 'agemoxi', 'procedimento', 'osh', 'orq', 'castracao', 'castração',
+    'outros', 'pós', 'pos', 'anestesia', 'machi', 'feito', 'microchip', 'chip', 'intercorrencia',
+    'intercorrência', 'intercorrências', 'observacao', 'observação', 'obs'
   ];
 
-  // Regra A: "nome [Nome]" ou "de nome [Nome]" (Ex: "nome Miguel" -> Miguel)
+  // Regra 1: Palavra explícita de nome ("nome [Nome]", "de nome [Nome]", "chamado [Nome]")
   const nameDirectRegex = /(?:nome|de\s+nome|chamad[oa]|paciente\s+chamad[oa])\s+([A-Za-zÀ-ÿ]+)/i;
   const nameDirectMatch = text.match(nameDirectRegex);
   if (nameDirectMatch && nameDirectMatch[1]) {
@@ -120,7 +105,37 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     }
   }
 
-  // Regra B: Palavra logo após a raça (Ex: "persa Luna", "Shih Tzu Bento", "srd princesa" ou "poodle Bob")
+  // Regra 2: Dicionário de Nomes Populares de Pets
+  if (patient_name === 'Paciente') {
+    const popularNames = [
+      'Zeus', 'Luna', 'Bento', 'Hugo', 'Miguel', 'Bob', 'Princesa', 'Mel', 'Spike', 'Mimi',
+      'Lulu', 'Thor', 'Amora', 'Nina', 'Max', 'Pipoca', 'Belinha', 'Billy', 'Ted', 'Simba',
+      'Meg', 'Mia', 'Chico', 'Fred', 'Toby', 'Marley', 'Pandora', 'Snoopy', 'Jack', 'Apolo',
+      'Cookie', 'Pretinha', 'Rex', 'Duque', 'Tobby', 'Suzi', 'Bidu', 'Costelinha', 'Caramelo',
+      'Fumaça', 'Floquinho', 'Pérola', 'Sol', 'Lola', 'Theo', 'Simba', 'Babi', 'Maya'
+    ];
+    for (const name of popularNames) {
+      const regex = new RegExp(`\\b${name}\\b`, 'i');
+      if (regex.test(text)) {
+        patient_name = name;
+        break;
+      }
+    }
+  }
+
+  // Regra 3: Palavra imediatamente anterior ao peso ou idade (ex: "Zeus 42kg", "Luna 3.5kg", "Bento 6kg")
+  if (patient_name === 'Paciente') {
+    const beforeWeightRegex = /(?:^|[,\s])([A-Za-zÀ-ÿ]{2,15})[,.\s]+(?:\d+(?:[.,]\d+)?\s*(?:kg|quilos?|kilos?|anos?|meses))/i;
+    const match = text.match(beforeWeightRegex);
+    if (match && match[1]) {
+      const candidate = match[1].toLowerCase();
+      if (!blacklistWords.includes(candidate) && candidate.length > 1) {
+        patient_name = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      }
+    }
+  }
+
+  // Regra 4: Palavra logo após a raça (Ex: "persa Luna", "Shih Tzu Bento", "srd princesa" ou "poodle Bob")
   if (patient_name === 'Paciente') {
     const breedFollowerRegex = new RegExp(`(?:${knownBreeds.join('|')})[,\\s]+([A-Za-zÀ-ÿ]+)`, 'i');
     const breedFollowerMatch = text.match(breedFollowerRegex);
@@ -131,29 +146,77 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
 
   // 9. Procedimento
   let procedure_type: ProcedureType = sex === 'F' ? 'OSH' : 'ORQ';
-  if (lower.includes('procedimento 1') || lower.includes('procedimento um') || lower.includes('orquiectomia') || lower.includes('orquio') || lower.includes('orqui') || lower.match(/\borq\b/) || lower.includes('castração de macho')) {
+  if (
+    lower.includes('procedimento 1') || lower.includes('procedimento um') ||
+    lower.includes('orquiectomia') || lower.includes('orquio') || lower.includes('orqui') ||
+    lower.includes('orque') || lower.match(/\borq\b/) || lower.includes('castração de macho') ||
+    lower.includes('castracao de macho')
+  ) {
     procedure_type = 'ORQ';
-  } else if (lower.includes('procedimento 2') || lower.includes('procedimento dois') || lower.match(/\bosh\b/) || lower.includes('ovario') || lower.includes('castração de fêmea')) {
+  } else if (
+    lower.includes('procedimento 2') || lower.includes('procedimento dois') ||
+    lower.match(/\bosh\b/) || lower.includes('ovario') || lower.includes('ovariohisterectomia') ||
+    lower.includes('castração de fêmea') || lower.includes('castracao de femea')
+  ) {
     procedure_type = 'OSH';
-  } else if (lower.includes('procedimento 3') || lower.includes('procedimento três') || lower.includes('procedimento tres') || lower.includes('outros') || lower.includes('nodulectomia') || lower.includes('tartarectomia')) {
+  } else if (
+    lower.includes('procedimento 3') || lower.includes('procedimento três') ||
+    lower.includes('procedimento tres') || lower.includes('outros') ||
+    lower.includes('nodulectomia') || lower.includes('tartarectomia')
+  ) {
     procedure_type = 'OUTROS';
   }
 
-  // 10. Fármacos anestésicos
+  // 10. Fármacos anestésicos (com suporte amplo a fonemas/erros comuns de reconhecimento de voz)
   const anesthesia_drugs: AnesthesiaDrugCode[] = [];
-  if (lower.includes('propofol') || lower.includes('propo')) anesthesia_drugs.push('P');
-  if (lower.includes('isoflurano') || lower.match(/\biso\b/) || lower.includes('inalatória')) anesthesia_drugs.push('I');
-  if (lower.includes('quetamina') || lower.includes('ketamina') || lower.includes('queta') || lower.includes('quieta') || lower.includes('quita') || lower.includes('keta')) anesthesia_drugs.push('K');
-  if (lower.includes('xilazina') || lower.includes('xila')) anesthesia_drugs.push('X');
-  if (lower.includes('tramadol') || lower.includes('tramal')) anesthesia_drugs.push('T');
-  if (lower.includes('vitamina k') || lower.includes('vit k')) anesthesia_drugs.push('VK');
-  if (lower.includes('transamin') || lower.includes('tranexâmico')) anesthesia_drugs.push('TM');
+
+  // Propofol
+  if (lower.includes('propofol') || lower.includes('propo') || lower.includes('propô') || lower.includes('propa') || lower.includes('propol')) {
+    anesthesia_drugs.push('P');
+  }
+  // Isoflurano
+  if (lower.includes('isoflurano') || lower.includes('isoflorano') || lower.match(/\biso\b/) || lower.includes('inalatória') || lower.includes('inalatoria')) {
+    anesthesia_drugs.push('I');
+  }
+  // Quetamina
+  if (lower.includes('quetamina') || lower.includes('ketamina') || lower.includes('queta') || lower.includes('quieta') || lower.includes('quita') || lower.includes('keta')) {
+    anesthesia_drugs.push('K');
+  }
+  // Xilazina (inclui fonemas comuns como mochila, axila, chila, quila)
+  if (
+    lower.includes('xilazina') || lower.includes('xila') || lower.includes('mochila') ||
+    lower.includes('axila') || lower.includes('chila') || lower.includes('quila') ||
+    lower.includes('zilazina') || lower.includes('estila')
+  ) {
+    anesthesia_drugs.push('X');
+  }
+  // Tramadol
+  if (lower.includes('tramadol') || lower.includes('tramal') || lower.includes('tranal') || lower.includes('tramado')) {
+    anesthesia_drugs.push('T');
+  }
+  // Vitamina K
+  if (lower.includes('vitamina k') || lower.includes('vit k') || lower.includes('vitk') || lower.includes('fitomenadiona')) {
+    anesthesia_drugs.push('VK');
+  }
+  // Transamin
+  if (lower.includes('transamin') || lower.includes('tranexâmico') || lower.includes('tranexamico') || lower.includes('transamim')) {
+    anesthesia_drugs.push('TM');
+  }
 
   // 11. Medicação pós
   const post_meds: PostMedCode[] = [];
-  if (lower.includes('agemoxi') || lower.includes('amoxicilina') || lower.includes('antibiótico')) post_meds.push('A');
-  if (lower.includes('meloxicam') || lower.includes('melox') || lower.includes('anti-inflamatório')) post_meds.push('M');
-  if (lower.includes('dipirona') || lower.includes('dipi') || lower.includes('analgésico')) post_meds.push('D');
+  // Agemoxi
+  if (lower.includes('agemoxi') || lower.includes('amoxicilina') || lower.includes('amoxi') || lower.includes('antibiótico') || lower.includes('antibiotico')) {
+    post_meds.push('A');
+  }
+  // Meloxicam
+  if (lower.includes('meloxicam') || lower.includes('melox') || lower.includes('meloc') || lower.includes('anti-inflamatório') || lower.includes('antiinflamatorio')) {
+    post_meds.push('M');
+  }
+  // Dipirona
+  if (lower.includes('dipirona') || lower.includes('dipi') || lower.includes('analgésico') || lower.includes('analgesico')) {
+    post_meds.push('D');
+  }
 
   // 12. Intercorrências
   let has_complication = false;
@@ -164,6 +227,8 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
 
   if (
     lower.includes('intercorrência') ||
+    lower.includes('intercorrencia') ||
+    lower.includes('intercorrências') ||
     lower.includes('complicação') ||
     lower.includes('hipotermia') ||
     lower.includes('bradicardia') ||
@@ -174,7 +239,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
     lower.includes('taquicardia') ||
     lower.includes('cianose')
   ) {
-    if (!lower.includes('sem intercorrência') && !lower.includes('sem complicação') && !lower.includes('sem intercorrencia')) {
+    if (!lower.includes('sem intercorrência') && !lower.includes('sem complicação') && !lower.includes('sem intercorrencia') && !lower.includes('sem intercorrências')) {
       has_complication = true;
       complication_notes = complicationBlockMatch ? complicationBlockMatch[1].trim() : text;
     }

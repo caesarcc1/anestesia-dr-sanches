@@ -103,6 +103,13 @@ export default function HomePage() {
     setRecords(dayRecords);
   };
 
+  const handleResetAllData = () => {
+    const clean = storage.resetToCleanState();
+    setSessions([clean]);
+    setActiveSession(clean);
+    setRecords([]);
+  };
+
   // Add parsed voice record to active session
   const handleConfirmVoiceRecord = (data: Partial<AnesthesiaRecord> & { order_index?: number }) => {
     if (!activeSession) return;
@@ -235,7 +242,7 @@ export default function HomePage() {
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / RECORDS_PER_PAGE));
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-28">
+    <div className="min-h-screen flex flex-col bg-slate-100/70 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-28 w-full max-w-full overflow-x-hidden">
       
       {/* Header */}
       <Header
@@ -433,6 +440,7 @@ export default function HomePage() {
         onSelectSession={handleSelectSession}
         onCreateSession={handleCreateSession}
         onUpdateSession={handleUpdateSession}
+        onResetAllData={handleResetAllData}
       />
 
     </div>

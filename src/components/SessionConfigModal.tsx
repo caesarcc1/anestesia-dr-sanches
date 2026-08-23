@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DailySession } from '@/types';
-import { X, Check, Calendar, Plus, MapPin, User, FileText } from 'lucide-react';
+import { X, Check, Calendar, Plus, MapPin, User, FileText, Trash2, AlertTriangle } from 'lucide-react';
 
 interface SessionConfigModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface SessionConfigModalProps {
   onSelectSession: (id: string) => void;
   onCreateSession: (session: Omit<DailySession, 'id' | 'created_at'>) => void;
   onUpdateSession: (session: DailySession) => void;
+  onResetAllData?: () => void;
 }
 
 export function SessionConfigModal({
@@ -22,6 +23,7 @@ export function SessionConfigModal({
   onSelectSession,
   onCreateSession,
   onUpdateSession,
+  onResetAllData,
 }: SessionConfigModalProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [date, setDate] = useState(activeSession.session_date);
@@ -30,6 +32,16 @@ export function SessionConfigModal({
   const [vetName, setVetName] = useState(activeSession.vet_name);
   const [vetCrmv, setVetCrmv] = useState(activeSession.vet_crmv);
 
+  useEffect(() => {
+    if (activeSession) {
+      setDate(activeSession.session_date);
+      setPageStart(activeSession.page_start_number);
+      setLocation(activeSession.location);
+      setVetName(activeSession.vet_name);
+      setVetCrmv(activeSession.vet_crmv);
+    }
+  }, [activeSession]);
+
   if (!isOpen) return null;
 
   const handleSaveCurrent = (e: React.FormEvent) => {
@@ -37,23 +49,32 @@ export function SessionConfigModal({
     if (isCreatingNew) {
       onCreateSession({
         session_date: date,
-        page_start_number: Number(pageStart) || 202,
+        page_start_number: Number(pageStart) || 1,
         location: location.trim() || 'Centro Cirúrgico Adote Vi.Ca',
         vet_name: vetName.trim() || 'Dr. Daniel Sanches',
-        vet_crmv: vetCrmv.trim() || 'CRMV-SP',
+        vet_crmv: vetCrmv.trim() || 'CRMV-SP 34.567',
         is_closed: false,
       });
     } else {
       onUpdateSession({
         ...activeSession,
         session_date: date,
-        page_start_number: Number(pageStart) || 202,
+        page_start_number: Number(pageStart) || 1,
         location: location.trim() || 'Centro Cirúrgico Adote Vi.Ca',
         vet_name: vetName.trim() || 'Dr. Daniel Sanches',
-        vet_crmv: vetCrmv.trim() || 'CRMV-SP',
+        vet_crmv: vetCrmv.trim() || 'CRMV-SP 34.567',
       });
     }
     onClose();
+  };
+
+  const handleResetDataClick = () => {
+    if (window.confirm('⚠️ ATENÇÃO: Deseja apagar todos os registros de teste e reiniciar a contagem de páginas na Página 1? Esta ação limpará todos os animais cadastrados para você começar a ficha real da clínica do zero.')) {
+      if (onResetAllData) {
+        onResetAllData();
+      }
+      onClose();
+    }
   };
 
   return (
@@ -64,7 +85,7 @@ export function SessionConfigModal({
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div>
             <h2 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white">
-              Configurações da Sessão Cirúrgica
+              Configurações da Ficha e Sessão
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Controle de datas, numeração de páginas e dados da clínica
@@ -92,7 +113,7 @@ export function SessionConfigModal({
                 onClick={() => {
                   setIsCreatingNew(true);
                   setDate(new Date().toISOString().split('T')[0]);
-                  setPageStart(202);
+                  setPageStart(1);
                 }}
                 className="text-xs font-bold text-vica-teal hover:underline flex items-center gap-1"
               >
@@ -132,21 +153,23 @@ export function SessionConfigModal({
 
             <div>
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1 flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5 text-slate-400" /> Número da Página Inicial na Prancheta
+                <FileText className="w-3.5 h-3.5 text-slate-400" /> Número da Página Inicial no PDF
               </label>
               <input
                 type="number"
                 value={pageStart}
-                onChange={e => setPageStart(parseInt(e.target.value) || 202)}
+                onChange={e => setPageStart(parseInt(e.target.value) || 1)}
                 required
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-vica-teal focus:outline-none font-bold"
               />
-              <p className="text-[11px] text-slate-400 mt-1">Ex: 202, 203, 204... para continuar a numeração física das fichas.</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Define o número da folha física (ex: Página 1, Página 2...).
+              </p>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" /> Nome do Local / Centro Cirúrgico
+                <MapPin className="w-3.5 h-3.5 text-slate-400" /> Centro Cirúrgico / Local
               </label>
               <input
                 type="text"
@@ -181,6 +204,20 @@ export function SessionConfigModal({
               </div>
             </div>
           </form>
+
+          {/* Reset / Clean Data Option */}
+          {onResetAllData && (
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={handleResetDataClick}
+                className="w-full py-2.5 px-3 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50/60 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+              >
+                <Trash2 className="w-4 h-4 text-rose-500" />
+                Limpar Todos os Registros de Teste (Reiniciar na Página 1)
+              </button>
+            </div>
+          )}
 
         </div>
 

@@ -12,7 +12,7 @@ const INITIAL_SESSIONS: DailySession[] = [
     vet_crmv: 'CRMV-SP 34.567',
     session_date: new Date().toISOString().split('T')[0],
     location: 'Centro Cirúrgico Adote Vi.Ca',
-    page_start_number: 202,
+    page_start_number: 1,
     is_closed: false,
     notes: 'Mutirão de castração de cães e gatos da região.',
     created_at: new Date().toISOString(),
@@ -343,5 +343,36 @@ export const storage = {
     }
 
     return newSession;
+  },
+
+  clearAllRecords: (sessionId?: string) => {
+    if (typeof window === 'undefined') return;
+    if (sessionId) {
+      const all = storage.getRecords().filter(r => r.session_id !== sessionId);
+      storage.saveRecords(all);
+    } else {
+      storage.saveRecords([]);
+    }
+  },
+
+  resetToCleanState: (startDate?: string): DailySession => {
+    const today = startDate || new Date().toISOString().split('T')[0];
+    const cleanSession: DailySession = {
+      id: 'session-' + Date.now(),
+      session_date: today,
+      vet_name: 'Dr. Daniel Sanches',
+      vet_crmv: 'CRMV-SP 34.567',
+      location: 'Centro Cirúrgico Adote Vi.Ca',
+      page_start_number: 1,
+      is_closed: false,
+      notes: '',
+      created_at: new Date().toISOString(),
+    };
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SESSIONS_KEY, JSON.stringify([cleanSession]));
+      localStorage.setItem(ACTIVE_SESSION_ID_KEY, cleanSession.id);
+      localStorage.setItem(RECORDS_KEY, JSON.stringify([]));
+    }
+    return cleanSession;
   },
 };

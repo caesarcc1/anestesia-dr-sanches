@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugCode, PostMedCode, ANESTHESIA_DRUGS, POST_MEDS } from '@/types';
-import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Check, RefreshCw, X, Volume2, AlertCircle, AlertTriangle, Dog, Cat, ArrowRight, Type } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface VoiceRecorderModalProps {
@@ -21,20 +21,23 @@ export function VoiceRecorderModal({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [transcript, setTranscript] = useState('');
-  const [manualText, setManualText] = useState('');
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [manualInputText, setManualInputText] = useState('');
+  const [showTextInput, setShowTextInput] = useState(false);
   const [parsedResult, setParsedResult] = useState<ParsedVoiceResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recognitionRef = useRef<any>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const liveTranscriptRef = useRef('');
 
-  // Quick preset voice examples for fast demo/testing
+  // Exemplos rápidos para testes com 1 toque
   const SAMPLE_VOICE_PROMPTS = [
-    'Canino, fêmea, Pitbull, Mel, 18 quilos, 3 anos, chip 982000456, anestesia Propofol e Isoflurano, pós Meloxicam e Dipirona, OSH, sem intercorrências.',
-    'Felino, macho, Siamês, Mingau, 4 quilos, 1 ano, Quetamina e Xilazina, pós Meloxicam, ORQ, tudo tranquilo.',
-    'Canino, fêmea, SRD, Frida, 8 quilos, 5 anos, Propofol Quetamina e Transamin, pós Agemoxi e Dipirona, OSH, sangramento uterino controlado.',
+    'Canino fêmea Pitbull Mel 18kg 3 anos chip 982000456 Propofol Isoflurano Meloxicam Dipirona OSH sem intercorrências',
+    'Felino macho Siamês Mingau 4kg 1 ano Quetamina Xilazina Meloxicam ORQ tudo tranquilo',
+    'Canino fêmea SRD Frida 8kg 5 anos Propofol Quetamina Transamin Agemoxi Dipirona OSH sangramento leve controlado',
   ];
 
   useEffect(() => {
@@ -50,21 +53,69 @@ export function VoiceRecorderModal({
     setIsRecording(false);
     setRecordingTime(0);
     setIsProcessing(false);
-    setTranscript('');
-    setManualText('');
+    setLiveTranscript('');
+    liveTranscriptRef.current = '';
+    setManualInputText('');
+    setShowTextInput(false);
     setParsedResult(null);
     setErrorMsg(null);
   };
 
   const startRecording = async () => {
     setErrorMsg(null);
-    setTranscript('');
+    setLiveTranscript('');
+    liveTranscriptRef.current = '';
     setParsedResult(null);
     audioChunksRef.current = [];
 
+    // 1. Inicia Web Speech Recognition no navegador (se disponível)
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'pt-BR';
+          recognition.continuous = true;
+          recognition.interimResults = true;
+
+          recognition.onresult = (event: any) => {
+            let current = '';
+            for (let i = 0; i < event.results.length; i++) {
+              current += event.results[i][0].transcript + ' ';
+            }
+            const trimmed = current.trim();
+            setLiveTranscript(trimmed);
+            liveTranscriptRef.current = trimmed;
+          };
+
+          recognition.onerror = (e: any) => {
+            console.warn('SpeechRecognition aviso:', e);
+          };
+
+          recognition.start();
+          recognitionRef.current = recognition;
+        } catch (recErr) {
+          console.warn('Não foi possível iniciar SpeechRecognition:', recErr);
+        }
+      }
+    }
+
+    // 2. Inicia gravação de áudio MediaRecorder
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          mimeType = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+          mimeType = 'audio/aac';
+        }
+      }
+
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -74,8 +125,8 @@ export function VoiceRecorderModal({
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await processAudio(audioBlob);
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        await processAudioAndText(audioBlob, liveTranscriptRef.current);
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -87,24 +138,53 @@ export function VoiceRecorderModal({
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err: any) {
-      console.warn('Microfone não autorizado ou indisponível:', err);
-      setErrorMsg('Acesso ao microfone não concedido. Você pode usar os exemplos abaixo ou digitar.');
+      console.warn('Microfone não acessível:', err);
+      // Se não der pelo MediaRecorder, tenta SpeechRecognition sozinho
+      if (recognitionRef.current) {
+        setIsRecording(true);
+        setRecordingTime(0);
+        timerRef.current = setInterval(() => {
+          setRecordingTime((prev) => prev + 1);
+        }, 1000);
+      } else {
+        setErrorMsg('Microfone não autorizado ou indisponível. Você pode usar os exemplos abaixo ou digitar.');
+      }
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    setIsRecording(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
+    } else if (liveTranscriptRef.current) {
+      handleProcessText(liveTranscriptRef.current);
     }
   };
 
-  const processAudio = async (audioBlob: Blob) => {
+  const processAudioAndText = async (audioBlob: Blob, textTranscript: string) => {
     setIsProcessing(true);
     setErrorMsg(null);
 
     try {
+      // Se já temos a transcrição do navegador, enviamos o texto diretamente para resposta ultrarrápida
+      if (textTranscript && textTranscript.trim().length > 3) {
+        await handleProcessText(textTranscript);
+        return;
+      }
+
+      // Caso contrário, enviamos o áudio base64
       const reader = new FileReader();
       reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
@@ -116,13 +196,14 @@ export function VoiceRecorderModal({
           body: JSON.stringify({
             audioBase64: base64Audio,
             mimeType: audioBlob.type || 'audio/webm',
+            text: textTranscript || '',
           }),
         });
 
         const data = await response.json();
         if (data.success && data.data) {
           setParsedResult(data.data);
-          setTranscript(data.data.raw_transcription || 'Áudio gravado com sucesso.');
+          setLiveTranscript(data.data.raw_transcription || 'Áudio processado com sucesso');
         } else {
           setErrorMsg(data.error || 'Não foi possível extrair os dados do áudio.');
         }
@@ -138,7 +219,7 @@ export function VoiceRecorderModal({
     if (!textToProcess.trim()) return;
     setIsProcessing(true);
     setErrorMsg(null);
-    setTranscript(textToProcess);
+    setLiveTranscript(textToProcess);
 
     try {
       const response = await fetch('/api/voice-parse', {
@@ -205,11 +286,11 @@ export function VoiceRecorderModal({
         </div>
 
         {/* Modal Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
           
           {/* Main Recording Station */}
           {!parsedResult && (
-            <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+            <div className="flex flex-col items-center justify-center py-4 text-center space-y-4">
               {/* Giant Recording Button */}
               <div className="relative">
                 {isRecording && (
@@ -243,19 +324,25 @@ export function VoiceRecorderModal({
                 </button>
               </div>
 
-              {/* Status / Timer Text */}
+              {/* Status / Live Transcription Feedback */}
               <div>
                 {isRecording ? (
-                  <div className="space-y-1">
+                  <div className="space-y-2 max-w-sm">
                     <p className="text-sm font-bold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-1.5 animate-pulse">
                       <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block" />
-                      Gravando áudio ({recordingTime}s)...
+                      Ouvindo ({recordingTime}s)... Toque no botão para finalizar
                     </p>
-                    <p className="text-xs text-slate-500">Toque no botão para finalizar</p>
+                    {liveTranscript ? (
+                      <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 italic border border-slate-200 dark:border-slate-700">
+                        "{liveTranscript}"
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">Pode ditar os dados do animal...</p>
+                    )}
                   </div>
                 ) : isProcessing ? (
                   <p className="text-sm font-bold text-vica-teal animate-pulse">
-                    ✨ IA Gemini interpretando jargão cirúrgico...
+                    ✨ Interpretando dados cirúrgicos do paciente...
                   </p>
                 ) : (
                   <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xs">
@@ -272,8 +359,43 @@ export function VoiceRecorderModal({
                 </div>
               )}
 
+              {/* Manual text input drawer toggle */}
+              <div className="w-full pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowTextInput(!showTextInput)}
+                  className="text-xs font-semibold text-vica-blue hover:underline flex items-center justify-center gap-1 mx-auto"
+                >
+                  <Type className="w-3.5 h-3.5" />
+                  {showTextInput ? 'Ocultar digitação manual' : 'Prefere digitar a frase?'}
+                </button>
+
+                {showTextInput && (
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Ex: Canino macho Thor 12kg Propofol ORQ..."
+                      value={manualInputText}
+                      onChange={e => setManualInputText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleProcessText(manualInputText);
+                      }}
+                      className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-vica-teal focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleProcessText(manualInputText)}
+                      disabled={isProcessing || !manualInputText.trim()}
+                      className="px-4 py-2 bg-vica-teal text-white rounded-xl text-xs font-bold shadow-sm"
+                    >
+                      Processar
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Test with Sample Prompts */}
-              <div className="w-full pt-4 border-t border-slate-100 dark:border-slate-800 text-left">
+              <div className="w-full pt-2 text-left">
                 <div className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
                   Ou teste com frases de exemplo (1 toque):
                 </div>
@@ -301,7 +423,7 @@ export function VoiceRecorderModal({
               <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center justify-between">
                 <div className="flex items-center gap-1.5 font-bold">
                   <Check className="w-4 h-4 text-emerald-600" />
-                  Dados Extraídos pela IA com Sucesso!
+                  Dados Extraídos com Sucesso!
                 </div>
                 <button
                   onClick={() => setParsedResult(null)}
@@ -318,7 +440,7 @@ export function VoiceRecorderModal({
                     <h3 className="font-bold text-lg text-slate-900 dark:text-white">
                       {parsedResult.patient_name || 'Paciente'}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 mt-0.5">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 mt-0.5 flex-wrap">
                       <span>Raça: <strong>{parsedResult.breed || 'SRD'}</strong></span>
                       <span>•</span>
                       <span>Peso: <strong>{parsedResult.weight_kg ? `${parsedResult.weight_kg} kg` : 'Não inf.'}</strong></span>
@@ -331,7 +453,7 @@ export function VoiceRecorderModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-wrap">
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
                       {parsedResult.species}
                     </span>

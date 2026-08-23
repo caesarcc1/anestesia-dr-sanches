@@ -56,7 +56,7 @@ export function RecordCard({
             {/* Microchip & Weight */}
             <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
               <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[11px]">
-                {record.microchip ? `Chip: ${record.microchip}` : 'Sem microchip'}
+                {record.microchip ? `Microchip: ${record.microchip}` : 'Sem microchip'}
               </span>
               {record.weight_kg !== null && record.weight_kg !== undefined && (
                 <span className="font-semibold text-slate-700 dark:text-slate-300">

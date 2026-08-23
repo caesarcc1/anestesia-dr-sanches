@@ -87,6 +87,7 @@ export interface AnesthesiaRecord {
 }
 
 export interface ParsedVoiceResult {
+  spoken_order_index?: number;
   microchip?: string;
   patient_name?: string;
   species?: SpeciesType;
@@ -105,3 +106,4 @@ export interface ParsedVoiceResult {
   confidence_summary?: string;
   raw_transcription?: string;
 }
+

@@ -6,6 +6,13 @@ import { ParsedVoiceResult, SpeciesType, SexType, ProcedureType, AnesthesiaDrugC
 function parseWithRegex(text: string): ParsedVoiceResult {
   const lower = text.toLowerCase();
   
+  // Número do animal/paciente falado (ex: "animal 9", "paciente 14", "número 11")
+  let spoken_order_index: number | undefined;
+  const orderMatch = lower.match(/(?:animal|paciente|número|numero|nº|n°)\s*(\d+)/i);
+  if (orderMatch) {
+    spoken_order_index = parseInt(orderMatch[1], 10);
+  }
+
   // Espécie
   let species: SpeciesType = 'CAN';
   if (lower.includes('felin') || lower.includes('gato') || lower.includes('gata')) {
@@ -38,7 +45,7 @@ function parseWithRegex(text: string): ParsedVoiceResult {
 
   // Microchip
   let microchip: string | undefined;
-  const chipMatch = lower.match(/(?:microchip|chip|número|numero)\s*([0-9a-zA-Z]{5,18})/i);
+  const chipMatch = lower.match(/(?:microchip|chip|número\s+chip|numero\s+chip)\s*([0-9a-zA-Z]{5,18})/i);
   if (chipMatch) {
     microchip = chipMatch[1];
   }
@@ -46,16 +53,18 @@ function parseWithRegex(text: string): ParsedVoiceResult {
   // Nome do animal
   let patient_name = 'Paciente';
   const namePatterns = [
-    /(?:chamad[oa]|nome|paciente)\s+([A-Za-zÀ-ÿ]+)/i,
+    /(?:de\s+nome|com\s+o\s+nome|nome|chamad[oa]|paciente\s+chamad[oa])\s+([A-Za-zÀ-ÿ]+)/i,
+    /(?:paciente|animal)\s+(?:número|numero|\d+)?\s*(?:cão|cadela|gato|gata|canino|felino)?\s*(?:de\s+nome\s+)?([A-Za-zÀ-ÿ]+)/i,
     /(?:pitbull|poodle|srd|pastor|labrador|bulldog|pinscher|siamês|persa)\s+([A-Za-zÀ-ÿ]+)/i,
-    /(?:canin[oa]|felin[oa]|macho|fêmea|femea)\s+([A-Za-zÀ-ÿ]+)/i,
   ];
+  const blacklistWords = ['macho', 'femea', 'fêmea', 'canino', 'felino', 'cão', 'cao', 'cadela', 'gato', 'gata', 'pitbull', 'poodle', 'srd', 'anos', 'quilos', 'kg', 'animal', 'paciente', 'de', 'do', 'da', 'com', 'sem', 'propofol', 'osh', 'orq', 'castracao', 'castração'];
+
   for (const pattern of namePatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
       const candidate = match[1].toLowerCase();
-      if (!['macho', 'femea', 'fêmea', 'canino', 'felino', 'pitbull', 'poodle', 'srd', 'anos', 'quilos', 'kg'].includes(candidate)) {
-        patient_name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
+      if (!blacklistWords.includes(candidate) && candidate.length > 1) {
+        patient_name = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
         break;
       }
     }
@@ -73,13 +82,13 @@ function parseWithRegex(text: string): ParsedVoiceResult {
 
   // Procedimento
   let procedure_type: ProcedureType = sex === 'F' ? 'OSH' : 'ORQ';
-  if (lower.includes('osh') || lower.includes('ovario') || lower.includes('castração de fêmea')) {
+  if (lower.includes('osh') || lower.includes('ovario') || lower.includes('castração de fêmea') || lower.includes('castracao de femea')) {
     procedure_type = 'OSH';
   }
-  if (lower.includes('orquiectomia') || lower.includes('orquio') || lower.includes('castração de macho')) {
+  if (lower.includes('orquiectomia') || lower.includes('orquio') || lower.includes('castração de macho') || lower.includes('castracao de macho')) {
     procedure_type = 'ORQ';
   }
-  if (lower.includes('outros') || lower.includes('nodulectomia') || lower.includes('tartarectomia') || lower.includes('hérnia')) {
+  if (lower.includes('outros') || lower.includes('nodulectomia') || lower.includes('tartarectomia') || lower.includes('hérnia') || lower.includes('hernia')) {
     procedure_type = 'OUTROS';
   }
 
@@ -118,6 +127,7 @@ function parseWithRegex(text: string): ParsedVoiceResult {
   }
 
   return {
+    spoken_order_index,
     species,
     sex,
     breed,
@@ -174,6 +184,7 @@ export async function POST(req: NextRequest) {
 Sua missão é extrair dados clínicos rigorosamente estruturados no seguinte formato JSON:
 
 {
+  "spoken_order_index": number | null,
   "microchip": string | null,
   "patient_name": string | null,
   "species": "CAN" | "FEL",
@@ -192,15 +203,17 @@ Sua missão é extrair dados clínicos rigorosamente estruturados no seguinte fo
   "raw_transcription": string
 }
 
-REGRAS:
-1. "CAN" (cão/canino), "FEL" (gato/felino).
-2. Sexo: "M" (macho), "F" (fêmea).
-3. Raça padrão se não dita: "SRD".
-4. Procedimento: "ORQ" (macho), "OSH" (fêmea), "OUTROS" (especiais).
-5. Fármacos: "P"(Propofol), "I"(Isoflurano), "K"(Quetamina), "X"(Xilazina), "T"(Tramadol), "VK"(Vit K), "TM"(Transamin).
-6. Pós: "A"(Agemoxi), "M"(Meloxicam), "D"(Dipirona).
-7. "has_complication": true somente se houver intercorrência clínica (ex: hipotermia, bradicardia, hemorragia). Se disser "sem intercorrências", marque false.
-8. Retorne apenas o JSON.`;
+REGRAS CRÍTICAS:
+1. "spoken_order_index": Se o veterinário disser "animal 9", "paciente 14", "número 10", extraia esse número inteiro aqui (ex: 9, 14, 10). Se não falar nenhum número, retorne null.
+2. Nome do animal: Extraia o nome com precisão caso ele diga "de nome Lulu", "nome Thor", "chamado Bob", "cadela Pipoca", etc.
+3. "CAN" (cão/canino), "FEL" (gato/felino).
+4. Sexo: "M" (macho), "F" (fêmea).
+5. Raça padrão se não dita: "SRD".
+6. Procedimento: "ORQ" (macho), "OSH" (fêmea), "OUTROS" (especiais).
+7. Fármacos: "P"(Propofol), "I"(Isoflurano), "K"(Quetamina), "X"(Xilazina), "T"(Tramadol), "VK"(Vit K), "TM"(Transamin).
+8. Pós: "A"(Agemoxi), "M"(Meloxicam), "D"(Dipirona).
+9. "has_complication": true somente se houver intercorrência clínica (ex: hipotermia, bradicardia, hemorragia). Se disser "sem intercorrências", marque false.
+10. Retorne apenas o JSON puro.`;
 
     const genAI = new GoogleGenerativeAI(apiKey);
     
@@ -248,7 +261,7 @@ REGRAS:
       }
     }
 
-    // Se todos os modelos do Gemini falharem (ex: 404 Not Found), usa o analisador inteligente local imediatamente
+    // Se todos os modelos do Gemini falharem, usa o analisador inteligente local imediatamente
     console.warn('Fallback ativado: processando com parser veterinário local.', lastError?.message);
     const fallbackResult = parseWithRegex(transcriptText || 'Canino macho SRD 10kg Propofol Meloxicam');
     return NextResponse.json({ success: true, data: fallbackResult });

@@ -70,26 +70,27 @@ export default function HomePage() {
   };
 
   // Add parsed voice record to active session
-  const handleConfirmVoiceRecord = (parsed: ParsedVoiceResult) => {
+  const handleConfirmVoiceRecord = (data: Partial<AnesthesiaRecord> & { order_index?: number }) => {
     if (!activeSession) return;
 
     storage.addRecord({
       session_id: activeSession.id,
-      patient_name: parsed.patient_name || 'Paciente',
-      breed: parsed.breed || 'SRD',
-      species: parsed.species || 'CAN',
-      sex: parsed.sex || 'M',
-      weight_kg: parsed.weight_kg ?? null,
-      age: parsed.age || '',
-      microchip: parsed.microchip || '',
-      procedure_type: parsed.procedure_type || 'ORQ',
-      procedure_other_desc: parsed.procedure_other_desc || '',
-      anesthesia_drugs: parsed.anesthesia_drugs || ['P', 'K'],
-      anesthesia_others: parsed.anesthesia_others || '',
-      post_meds: parsed.post_meds || ['M', 'D'],
-      has_complication: parsed.has_complication || false,
-      complication_notes: parsed.complication_notes || '',
-      observations: parsed.observations || '',
+      order_index: data.order_index,
+      patient_name: data.patient_name || 'Paciente',
+      breed: data.breed || 'SRD',
+      species: data.species || 'CAN',
+      sex: data.sex || 'M',
+      weight_kg: data.weight_kg ?? null,
+      age: data.age || '',
+      microchip: data.microchip || '',
+      procedure_type: data.procedure_type || 'ORQ',
+      procedure_other_desc: data.procedure_other_desc || '',
+      anesthesia_drugs: data.anesthesia_drugs || ['P', 'K'],
+      anesthesia_others: data.anesthesia_others || '',
+      post_meds: data.post_meds || ['M', 'D'],
+      has_complication: data.has_complication || false,
+      complication_notes: data.complication_notes || '',
+      observations: data.observations || '',
     });
 
     reloadRecords();
@@ -367,6 +368,7 @@ export default function HomePage() {
         onClose={() => setIsVoiceModalOpen(false)}
         onConfirmRecord={handleConfirmVoiceRecord}
         sessionId={activeSession.id}
+        existingRecords={records}
       />
 
       <RecordFormModal

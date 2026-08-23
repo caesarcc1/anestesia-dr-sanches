@@ -236,10 +236,10 @@ export const storage = {
     localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
   },
 
-  addRecord: (record: Omit<AnesthesiaRecord, 'id' | 'order_index' | 'created_at'>): AnesthesiaRecord => {
+  addRecord: (record: Omit<AnesthesiaRecord, 'id' | 'order_index' | 'created_at'> & { order_index?: number }): AnesthesiaRecord => {
     const allRecords = storage.getRecords();
     const sessionRecords = allRecords.filter(r => r.session_id === record.session_id);
-    const nextOrder = sessionRecords.length + 1;
+    const nextOrder = record.order_index && record.order_index > 0 ? record.order_index : sessionRecords.length + 1;
 
     const newRecord: AnesthesiaRecord = {
       ...record,

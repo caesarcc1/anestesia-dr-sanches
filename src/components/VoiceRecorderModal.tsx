@@ -55,7 +55,8 @@ export function VoiceRecorderModal({
 
   const recognitionRef = useRef<any>(null);
   const isRecordingRef = useRef(false);
-  const accumulatedTranscriptRef = useRef('');
+  const finalizedSegmentsRef = useRef<string[]>([]);
+  const currentSegmentRef = useRef<string>('');
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const nextDefaultOrder = existingRecords.length + 1;
@@ -119,7 +120,8 @@ export function VoiceRecorderModal({
     setRecordingTime(0);
     setIsProcessing(false);
     setLiveTranscript('');
-    accumulatedTranscriptRef.current = '';
+    finalizedSegmentsRef.current = [];
+    currentSegmentRef.current = '';
     setManualInputText('');
     setShowTextInput(false);
     setParsedResult(null);
@@ -132,7 +134,7 @@ export function VoiceRecorderModal({
   // Preenche todos os campos editáveis a partir do resultado retornado
   const populateEditableFields = (data: ParsedVoiceResult) => {
     setParsedResult(data);
-    setRawEditableText(data.raw_transcription || accumulatedTranscriptRef.current || '');
+    setRawEditableText(data.raw_transcription || '');
     setPatientName(data.patient_name || 'Paciente');
     setBreed(data.breed || 'SRD');
     setSpecies(data.species || 'CAN');
@@ -174,7 +176,8 @@ export function VoiceRecorderModal({
   const startRecording = async () => {
     setErrorMsg(null);
     setLiveTranscript('');
-    accumulatedTranscriptRef.current = '';
+    finalizedSegmentsRef.current = [];
+    currentSegmentRef.current = '';
     setParsedResult(null);
 
     const SpeechRecognition = typeof window !== 'undefined'
@@ -190,7 +193,6 @@ export function VoiceRecorderModal({
     try {
       const recognition = new SpeechRecognition();
       recognition.lang = 'pt-BR';
-      // Modo Gemini/WhatsApp: sem interimResults para não repetir palavras na tela!
       recognition.continuous = true;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
@@ -200,11 +202,11 @@ export function VoiceRecorderModal({
         for (let i = 0; i < event.results.length; ++i) {
           full += event.results[i][0].transcript + ' ';
         }
-        const cleaned = cleanAndDeduplicateSpeech(full);
-        if (cleaned) {
-          accumulatedTranscriptRef.current = cleaned;
-          setLiveTranscript(cleaned);
-        }
+        currentSegmentRef.current = full.trim();
+        const allParts = [...finalizedSegmentsRef.current, currentSegmentRef.current];
+        const combined = allParts.filter(Boolean).join(' ');
+        const cleaned = cleanAndDeduplicateSpeech(combined);
+        setLiveTranscript(cleaned);
       };
 
       recognition.onerror = (e: any) => {
@@ -215,6 +217,10 @@ export function VoiceRecorderModal({
       };
 
       recognition.onend = () => {
+        if (currentSegmentRef.current) {
+          finalizedSegmentsRef.current.push(currentSegmentRef.current);
+          currentSegmentRef.current = '';
+        }
         if (isRecordingRef.current) {
           try {
             recognition.start();
@@ -256,16 +262,19 @@ export function VoiceRecorderModal({
 
     setIsProcessing(true);
 
-    // Aguarda 350ms para que o último buffer de fala do navegador finalize
+    // Aguarda 400ms para que o último buffer de fala do navegador finalize
     setTimeout(() => {
-      const textToParse = cleanAndDeduplicateSpeech(accumulatedTranscriptRef.current.trim());
+      const allParts = [...finalizedSegmentsRef.current, currentSegmentRef.current];
+      const combined = allParts.filter(Boolean).join(' ');
+      const textToParse = cleanAndDeduplicateSpeech(combined.trim());
+
       if (textToParse && textToParse.length > 2) {
         handleProcessText(textToParse);
       } else {
         setIsProcessing(false);
         setErrorMsg('Nenhuma fala foi capturada. Fale mais perto do microfone ou use os exemplos rápidos.');
       }
-    }, 350);
+    }, 400);
   };
 
   const handleProcessText = async (textToProcess: string) => {

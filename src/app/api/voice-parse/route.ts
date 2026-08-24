@@ -70,15 +70,17 @@ Sua missão é extrair dados clínicos rigorosamente estruturados no seguinte fo
 
 REGRAS:
 1. "spoken_order_index": Se falar "animal 9", "paciente 14", "número 11", extraia o número inteiro (ex: 9, 14, 11).
-2. Nome: Extraia com precisão (ex: "nome Miguel" -> "Miguel", "princesa" -> "Princesa").
-3. Raça: Identifique raças como "Galgo Italiano", "Pitbull", "Poodle", "SRD", etc.
-4. "CAN" (cão), "FEL" (gato).
-5. Sexo: "M" (macho), "F" (fêmea).
-6. Procedimento: "ORQ" (procedimento 1 / macho), "OSH" (procedimento 2 / fêmea), "OUTROS" (procedimento 3).
-7. Fármacos: "P"(Propofol), "I"(Isoflurano), "K"(Quetamina), "X"(Xilazina), "T"(Tramadol), "VK"(Vit K), "TM"(Transamin).
-8. Pós: "A"(Agemoxi), "M"(Meloxicam), "D"(Dipirona).
-9. "has_complication": true apenas se houver intercorrência clínica. Se disser "sem intercorrências", marque false.
-10. Retorne apenas o JSON puro.`;
+2. Nome: Extraia com precisão (ex: "nome César" -> "César", "nome Priscila" -> "Priscila", "Spike" -> "Spike", "Zeus" -> "Zeus").
+3. Microchip: Extraia números de chip (ex: "microchip 811" -> "811", "final de microchip 116" -> "116").
+4. Raça: Identifique raças caninas e felinas (ex: "Pinscher", "Malamute", "Galgo Italiano", "Pitbull", "Poodle", "Shih Tzu", "Rottweiler", "SRD", etc.).
+5. Espécie: "CAN" (cão/canino), "FEL" (gato/felino).
+6. Sexo: "M" (macho), "F" (fêmea).
+7. Procedimento: "ORQ" (orquiectomia / castração de macho), "OSH" (ovariohisterectomia / castração de fêmea), "OUTROS" (procedimento 3 / outros).
+8. Fármacos: "P"(Propofol), "I"(Isoflurano), "K"(Quetamina), "X"(Xilazina), "T"(Tramadol), "VK"(Vit K), "TM"(Transamin).
+9. Pós: "A"(Agemoxi / Agemox / Amoxicilina), "M"(Meloxicam / Maxicam / Meloxivet), "D"(Dipirona / Novalgina). Se disser "agemox maxicam dipirona", retorne ["A", "M", "D"].
+10. Observações: Extraia notas como "Piometra", "Jejum ok", "Nódulo", etc.
+11. "has_complication": true apenas se houver intercorrência cirúrgica/anestésica real (apneia, bradicardia, hemorragia). Se disser "sem intercorrências", marque false.
+12. Retorne apenas o JSON puro.`;
 
     if (apiKey) {
       const genAI = new GoogleGenerativeAI(apiKey);

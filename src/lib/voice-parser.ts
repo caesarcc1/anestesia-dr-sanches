@@ -77,6 +77,63 @@ export function cleanAndDeduplicateSpeech(raw: string): string {
   return text.trim();
 }
 
+// Dicionário Veterinário Completo de Raças com Variações Fonéticas e Transcrições Comuns
+export const BREED_MAPPINGS: [RegExp, string][] = [
+  // CÃES
+  [/\b(pinscher|pincher|pinsher|pícher|picher|pincer|esquilos|esquilo|pinxe|pinx)\b/i, 'Pinscher'],
+  [/\b(shih\s*tzu|shihtzu|shitzu|shit\s*zu|chits|xitsu|chitsu|xixi|citsu|chitson)\b/i, 'Shih Tzu'],
+  [/\b(yorkshire|york|york\s*shire|yorki|iorque|iorg|iorqueshaire|yorke|iorquinho)\b/i, 'Yorkshire'],
+  [/\b(spitz\s*alemão|spitz\s*alemao|spitz|lulu\s*da\s*pomerânia|lulu\s*da\s*pomerania|lulu|pomerânia|pomerania|espitiz|espits)\b/i, 'Spitz Alemão'],
+  [/\b(poodle|pudle|pudol|pudim|puddle|pudo)\b/i, 'Poodle'],
+  [/\b(maltês|maltes|maltez|maltese|matez)\b/i, 'Maltês'],
+  [/\b(lhasa\s*apso|lhasa|lhassa|lasa\s*apso|lasa|laça|laço)\b/i, 'Lhasa Apso'],
+  [/\b(schnauzer|esnauzer|chnauzer|snauzer|isnouzer)\b/i, 'Schnauzer'],
+  [/\b(pug|pague|puge|paguei)\b/i, 'Pug'],
+  [/\b(bulldog\s*francês|bulldog\s*frances|buldogue\s*francês|buldogue\s*frances|frenchie|budoque)\b/i, 'Bulldog Francês'],
+  [/\b(bulldog\s*inglês|bulldog\s*ingles|buldogue\s*inglês|buldogue\s*ingles|bulldog|buldogue|buldog)\b/i, 'Bulldog'],
+  [/\b(dachshund|dachs|teckel|tekel|salsicha|salsichinha|basset\s*salsicha|daskund|daquichunde)\b/i, 'Dachshund'],
+  [/\b(golden\s*retriever|golden|gold|golde|goudem)\b/i, 'Golden Retriever'],
+  [/\b(labrador\s*retriever|labrador|labradol|labra|labrado)\b/i, 'Labrador'],
+  [/\b(rottweiler|rotweiler|rotvailer|rotevaile|rot|rotwailler|hottweiler)\b/i, 'Rottweiler'],
+  [/\b(pastor\s*alemão|pastor\s*alemao|pastor|capa\s*preta)\b/i, 'Pastor Alemão'],
+  [/\b(pastor\s*belga|malinois|belga\s*malinois|belga)\b/i, 'Pastor Belga'],
+  [/\b(border\s*collie|border|borde|collie|boder\s*coli|border\s*coli)\b/i, 'Border Collie'],
+  [/\b(beagle|bigol|bico|bigu|biguo)\b/i, 'Beagle'],
+  [/\b(pitbull|pit\s*bull|pit\s*bul|pit|american\s*bully|bully|pitmonster|pit\s*monster|monster)\b/i, 'Pitbull'],
+  [/\b(boxer|boquece|bokser|bokcer)\b/i, 'Boxer'],
+  [/\b(chow\s*chow|chow-chow|chow|tchau\s*tchau|chou\s*chou|xau\s*xau)\b/i, 'Chow Chow'],
+  [/\b(husky\s*siberiano|husky|ruski|rasque|hasque|rusk)\b/i, 'Husky Siberiano'],
+  [/\b(alaskan\s*malamute|malamute\s*do\s*alasca|malamute|mala\s*mute|malu)\b/i, 'Malamute'],
+  [/\b(dálmata|dalmata|damata)\b/i, 'Dálmata'],
+  [/\b(doberman|dobermann|doberma)\b/i, 'Doberman'],
+  [/\b(cocker\s*spaniel|cocker|coquer|koker|coquer\s*espanhol)\b/i, 'Cocker Spaniel'],
+  [/\b(chihuahua|chiuaua|chiuawa|xuaua|quiuaua)\b/i, 'Chihuahua'],
+  [/\b(akita\s*inu|akita|aquita)\b/i, 'Akita'],
+  [/\b(shiba\s*inu|shiba|xiba)\b/i, 'Shiba Inu'],
+  [/\b(weimaraner|veimaraner|weimar|veimar)\b/i, 'Weimaraner'],
+  [/\b(basset\s*hound|basset|bassê|basse)\b/i, 'Basset Hound'],
+  [/\b(dogue\s*alemão|dogue\s*alemao|dogue|gran\s*danes|dog\s*alemão)\b/i, 'Dogue Alemão'],
+  [/\b(cane\s*corso|cane\s*corço|cane|corso)\b/i, 'Cane Corso'],
+  [/\b(shar-pei|shar\s*pei|sharpei|xarpei|charpei)\b/i, 'Shar-pei'],
+  [/\b(fila\s*brasileiro|fila)\b/i, 'Fila Brasileiro'],
+  [/\b(fox\s*paulistinha|terrier\s*brasileiro|fox|paulistinha)\b/i, 'Fox Paulistinha'],
+  [/\b(blue\s*heeler|red\s*heeler|boiadeiro\s*australiano|australian\s*cattle\s*dog|heeler)\b/i, 'Blue Heeler'],
+  [/\b(galgo\s*italiano|galgo|greyhound|whippet)\b/i, 'Galgo Italiano'],
+
+  // FELINOS
+  [/\b(siamês|siames|siamez|siameze)\b/i, 'Siamês'],
+  [/\b(persa|gato\s*persa|persia)\b/i, 'Persa'],
+  [/\b(maine\s*coon|mainecoon|maine\s*con|gato\s*gigante)\b/i, 'Maine Coon'],
+  [/\b(ragdoll|rag\s*doll|regdol)\b/i, 'Ragdoll'],
+  [/\b(sphynx|esfinge|gato\s*pelado|esfinx)\b/i, 'Sphynx'],
+  [/\b(bengal|gato\s*de\s*bengala|bengali)\b/i, 'Bengal'],
+  [/\b(british\s*shorthair|britânico|britanico|british)\b/i, 'British Shorthair'],
+  [/\b(angorá|angora|angorah)\b/i, 'Angorá'],
+
+  // SEM RAÇA DEFINIDA / MESTIÇO
+  [/\b(srd|vira[- ]lata|sem\s*raça\s*definida|sem\s*raca\s*definida|mestiço|mestico|comum)\b/i, 'SRD'],
+];
+
 // Fallback rule-based parser in case no GEMINI_API_KEY is configured or model fails
 export function parseWithRegex(rawText: string): ParsedVoiceResult {
   const textCleaned = cleanAndDeduplicateSpeech(rawText);
@@ -92,14 +149,20 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
 
   // 2. Espécie
   let species: SpeciesType = 'CAN';
-  if (lower.includes('felin') || lower.includes('gato') || lower.includes('gata')) {
+  if (
+    lower.includes('felin') || lower.includes('gato') || lower.includes('gata') ||
+    lower.includes('persa') || lower.includes('siames') || lower.includes('siamês') ||
+    lower.includes('ragdoll') || lower.includes('sphynx') || lower.includes('angora') || lower.includes('angorá')
+  ) {
     species = 'FEL';
   } else if (
     lower.includes('canin') || lower.includes('cão') || lower.includes('cao') ||
     lower.includes('cachorr') || lower.includes('cadela') || lower.includes('poodle') ||
     lower.includes('pitbull') || lower.includes('galgo') || lower.includes('pastor') ||
     lower.includes('pinscher') || lower.includes('pincher') || lower.includes('shih') ||
-    lower.includes('rottweiler') || lower.includes('malamute')
+    lower.includes('rottweiler') || lower.includes('malamute') || lower.includes('golden') ||
+    lower.includes('labrador') || lower.includes('beagle') || lower.includes('pug') ||
+    lower.includes('yorkshire') || lower.includes('spitz')
   ) {
     species = 'CAN';
   }
@@ -133,45 +196,14 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
 
   // 6. Microchip (ex: "microchip 811", "final de microchip 116", "chip 982000887766")
   let microchip: string | undefined;
-  const chipMatch = lower.match(/(?:microchip|chip|número\s+chip|numero\s+chip|final\s+de\s+microchip)\s*([0-9a-zA-Z-]{3,18})/i);
+  const chipMatch = lower.match(/(?:microchip|chip|número\s*chip|numero\s*chip|final\s*de\s*microchip)\s*([0-9a-zA-Z-]{3,18})/i);
   if (chipMatch) {
     microchip = chipMatch[1].replace(/[^0-9a-zA-Z]/g, '');
   }
 
   // 7. Raça (com mapeamento fonético abrangente para variações de voz)
   let breed = 'SRD';
-  const breedMappings: [RegExp, string][] = [
-    [/\b(malamute|alaskan\s+malamute|malamute\s+do\s+alasca|malu)\b/i, 'Malamute'],
-    [/\b(galgo\s+italiano|galgo)\b/i, 'Galgo Italiano'],
-    [/\b(pitbull|pit\s+bull|pit\s+bul)\b/i, 'Pitbull'],
-    [/\b(poodle|pudle|pudol)\b/i, 'Poodle'],
-    [/\b(pinscher|pincher|pinsher|pícher|pincer|esquilos|esquilo)\b/i, 'Pinscher'],
-    [/\b(shih\s+tzu|shihtzu|shitzu|shit\s+zu)\b/i, 'Shih Tzu'],
-    [/\b(rottweiler|rotweiler|rotvailer|rotevaile|rot)\b/i, 'Rottweiler'],
-    [/\b(pastor\s+alemão|pastor\s+alemao|pastor)\b/i, 'Pastor Alemão'],
-    [/\b(labrador|labradol)\b/i, 'Labrador'],
-    [/\b(golden\s+retriever|golden)\b/i, 'Golden Retriever'],
-    [/\b(siamês|siames)\b/i, 'Siamês'],
-    [/\b(persa)\b/i, 'Persa'],
-    [/\b(bulldog|buldogue|buldog)\b/i, 'Bulldog'],
-    [/\b(dachshund|teckel|salsicha)\b/i, 'Dachshund'],
-    [/\b(border\s+collie|border)\b/i, 'Border Collie'],
-    [/\b(beagle|bigol)\b/i, 'Beagle'],
-    [/\b(chihuahua|chiuaua)\b/i, 'Chihuahua'],
-    [/\b(spitz|lulu\s+da\s+pomerânia|lulu\s+da\s+pomerania)\b/i, 'Spitz'],
-    [/\b(akita|akita\s+inu)\b/i, 'Akita'],
-    [/\b(husky|husky\s+siberiano)\b/i, 'Husky'],
-    [/\b(chow\s+chow|chow-chow|chow)\b/i, 'Chow Chow'],
-    [/\b(shiba|shiba\s+inu)\b/i, 'Shiba Inu'],
-    [/\b(cocker|cocker\s+spaniel)\b/i, 'Cocker'],
-    [/\b(cane\s+corso)\b/i, 'Cane Corso'],
-    [/\b(dálmata|dalmata)\b/i, 'Dálmata'],
-    [/\b(angorá|angora)\b/i, 'Angorá'],
-    [/\b(maine\s+coon)\b/i, 'Maine Coon'],
-    [/\b(srd|vira[- ]lata|sem\s+raça\s+definida|sem\s+raca\s+definida)\b/i, 'SRD'],
-  ];
-
-  for (const [pattern, bName] of breedMappings) {
+  for (const [pattern, bName] of BREED_MAPPINGS) {
     if (pattern.test(lower)) {
       breed = bName;
       break;
@@ -192,7 +224,7 @@ export function parseWithRegex(rawText: string): ParsedVoiceResult {
   ];
 
   // Regra 1: Palavra explícita de nome ("nome [Nome]", "de nome [Nome]", "chamado [Nome]")
-  const nameDirectRegex = /(?:nome|de\s+nome|chamad[oa]|paciente\s+chamad[oa])\s+([A-Za-zÀ-ÿ]+)/i;
+  const nameDirectRegex = /(?:nome|de\s*nome|chamad[oa]|paciente\s*chamad[oa])\s+([A-Za-zÀ-ÿ]+)/i;
   const nameDirectMatch = text.match(nameDirectRegex);
   if (nameDirectMatch && nameDirectMatch[1]) {
     const candidate = nameDirectMatch[1].toLowerCase();

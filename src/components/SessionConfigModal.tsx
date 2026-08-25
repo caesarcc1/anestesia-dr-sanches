@@ -51,8 +51,8 @@ export function SessionConfigModal({
         session_date: date,
         page_start_number: Number(pageStart) || 1,
         location: location.trim() || 'Centro Cirúrgico Adote Vi.Ca',
-        vet_name: vetName.trim() || 'Dr. Daniel Sanches',
-        vet_crmv: vetCrmv.trim() || 'CRMV-SP 34.567',
+        vet_name: vetName.trim() || 'Dr. Daniel Sanches Rodriguez',
+        vet_crmv: vetCrmv.trim() || 'CRMV-SP 28792',
         is_closed: false,
       });
     } else {
@@ -61,8 +61,8 @@ export function SessionConfigModal({
         session_date: date,
         page_start_number: Number(pageStart) || 1,
         location: location.trim() || 'Centro Cirúrgico Adote Vi.Ca',
-        vet_name: vetName.trim() || 'Dr. Daniel Sanches',
-        vet_crmv: vetCrmv.trim() || 'CRMV-SP 34.567',
+        vet_name: vetName.trim() || 'Dr. Daniel Sanches Rodriguez',
+        vet_crmv: vetCrmv.trim() || 'CRMV-SP 28792',
       });
     }
     onClose();

@@ -8,8 +8,8 @@ const ACTIVE_SESSION_ID_KEY = 'vica_active_session_id';
 const INITIAL_SESSIONS: DailySession[] = [
   {
     id: 'session-demo-today',
-    vet_name: 'Dr. Daniel Sanches',
-    vet_crmv: 'CRMV-SP 34.567',
+    vet_name: 'Dr. Daniel Sanches Rodriguez',
+    vet_crmv: 'CRMV-SP 28792',
     session_date: new Date().toISOString().split('T')[0],
     location: 'Centro Cirúrgico Adote Vi.Ca',
     page_start_number: 1,
@@ -325,8 +325,8 @@ export const storage = {
     const newSession: DailySession = {
       id: 'session-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       session_date: dateStr,
-      vet_name: lastSession?.vet_name || 'Dr. Daniel Sanches',
-      vet_crmv: lastSession?.vet_crmv || 'CRMV-SP 34.567',
+      vet_name: lastSession?.vet_name || 'Dr. Daniel Sanches Rodriguez',
+      vet_crmv: lastSession?.vet_crmv || 'CRMV-SP 28792',
       location: lastSession?.location || 'Centro Cirúrgico Adote Vi.Ca',
       page_start_number: maxPage + 1,
       is_closed: false,
@@ -360,8 +360,8 @@ export const storage = {
     const cleanSession: DailySession = {
       id: 'session-' + Date.now(),
       session_date: today,
-      vet_name: 'Dr. Daniel Sanches',
-      vet_crmv: 'CRMV-SP 34.567',
+      vet_name: 'Dr. Daniel Sanches Rodriguez',
+      vet_crmv: 'CRMV-SP 28792',
       location: 'Centro Cirúrgico Adote Vi.Ca',
       page_start_number: 1,
       is_closed: false,

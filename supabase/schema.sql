@@ -10,8 +10,8 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.daily_sessions (
   id uuid primary key default gen_random_uuid(),
   vet_id uuid references auth.users(id) on delete set null,
-  vet_name text not null default 'Dr. Daniel Sanches',
-  vet_crmv text not null default 'CRMV-SP 34.567',
+  vet_name text not null default 'Dr. Daniel Sanches Rodriguez',
+  vet_crmv text not null default 'CRMV-SP 28792',
   session_date date not null default current_date,
   location text not null default 'Centro Cirúrgico Adote Vi.Ca',
   page_start_number integer not null default 202,

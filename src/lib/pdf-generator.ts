@@ -17,7 +17,7 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
 
   const RECORDS_PER_PAGE = 8;
   const totalPages = Math.max(1, Math.ceil(records.length / RECORDS_PER_PAGE));
-  const startPageNumber = session.page_start_number || 202;
+  const startPageNumber = session.page_start_number || 1;
 
   // Format Brazilian date DD/MM/YYYY
   const [year, month, day] = session.session_date.split('-');
@@ -56,15 +56,15 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
       const rec = recordsToRender[i];
 
       if (rec) {
-        // Format Species
-        const canMark = rec.species === 'CAN' ? '[CAN]' : '(CAN)';
-        const felMark = rec.species === 'FEL' ? '[FEL]' : '(FEL)';
-        const speciesCol = `${canMark} ${felMark}`;
+        // Format Species com marcação (X) / ( )
+        const canMark = rec.species === 'CAN' ? '(X) CAN' : '( ) CAN';
+        const felMark = rec.species === 'FEL' ? '(X) FEL' : '( ) FEL';
+        const speciesCol = `${canMark}  ${felMark}`;
 
-        // Format Sex
-        const mMark = rec.sex === 'M' ? '[M]' : '(M)';
-        const fMark = rec.sex === 'F' ? '[F]' : '(F)';
-        const sexCol = `${mMark} ${fMark}`;
+        // Format Sex com marcação (X) / ( )
+        const mMark = rec.sex === 'M' ? '(X) M' : '( ) M';
+        const fMark = rec.sex === 'F' ? '(X) F' : '( ) F';
+        const sexCol = `${mMark}  ${fMark}`;
 
         // Format Weight & Age
         const weightCol = rec.weight_kg !== null && rec.weight_kg !== undefined ? `${rec.weight_kg} kg` : '-';
@@ -75,35 +75,35 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
           ? `${rec.patient_name}${rec.breed ? ` (${rec.breed})` : ''}`
           : (rec.breed || '-');
 
-        // Format Anesthesia Drugs
+        // Format Anesthesia Drugs com marcação (X) / ( )
         const drugsList = ['P', 'I', 'K', 'X', 'T', 'VK', 'TM'];
         const drugsFormatted = drugsList
-          .map(d => (rec.anesthesia_drugs.includes(d as any) ? `[${d}]` : `(${d})`))
+          .map(d => (rec.anesthesia_drugs.includes(d as any) ? `(X)${d}` : `( )${d}`))
           .join(' ');
 
-        // Format Post Meds
+        // Format Post Meds com marcação (X) / ( )
         const postList = ['A', 'M', 'D'];
         const postFormatted = postList
-          .map(m => (rec.post_meds.includes(m as any) ? `[${m}]` : `(${m})`))
+          .map(m => (rec.post_meds.includes(m as any) ? `(X)${m}` : `( )${m}`))
           .join(' ');
 
-        // Format Procedure
-        let procFormatted = '(1) (2) (3)';
-        if (rec.procedure_type === 'ORQ') procFormatted = '[1] (2) (3)';
-        else if (rec.procedure_type === 'OSH') procFormatted = '(1) [2] (3)';
-        else if (rec.procedure_type === 'OUTROS') procFormatted = '(1) (2) [3]';
+        // Format Procedure com marcação (X) / ( )
+        let procFormatted = '( )1  ( )2  ( )3';
+        if (rec.procedure_type === 'ORQ') procFormatted = '(X)1  ( )2  ( )3';
+        else if (rec.procedure_type === 'OSH') procFormatted = '( )1  (X)2  ( )3';
+        else if (rec.procedure_type === 'OUTROS') procFormatted = '( )1  ( )2  (X)3';
 
         // Row 1: Dados do animal
         tableBody.push([
           { content: rec.microchip || `Nº ${rec.order_index}`, styles: { fontStyle: 'bold' } },
-          { content: speciesCol, styles: { halign: 'center' } },
-          { content: sexCol, styles: { halign: 'center' } },
+          { content: speciesCol, styles: { halign: 'center', fontStyle: 'bold' } },
+          { content: sexCol, styles: { halign: 'center', fontStyle: 'bold' } },
           { content: weightCol, styles: { halign: 'center' } },
           { content: ageCol, styles: { halign: 'center' } },
           { content: nameBreedCol, styles: { fontStyle: 'bold' } },
-          { content: drugsFormatted, styles: { halign: 'center', fontSize: 7 } },
+          { content: drugsFormatted, styles: { halign: 'center', fontSize: 7, fontStyle: 'bold' } },
           { content: rec.anesthesia_others || '-', styles: { fontSize: 7 } },
-          { content: postFormatted, styles: { halign: 'center', fontSize: 7 } },
+          { content: postFormatted, styles: { halign: 'center', fontSize: 7, fontStyle: 'bold' } },
           { content: procFormatted, styles: { halign: 'center', fontStyle: 'bold' } },
         ]);
 
@@ -135,15 +135,15 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
         // Blank row only if totally 0 records
         tableBody.push([
           { content: '' },
-          { content: '(CAN) (FEL)', styles: { halign: 'center', textColor: [160, 160, 160] } },
-          { content: '(M) (F)', styles: { halign: 'center', textColor: [160, 160, 160] } },
+          { content: '( ) CAN  ( ) FEL', styles: { halign: 'center', textColor: [160, 160, 160] } },
+          { content: '( ) M  ( ) F', styles: { halign: 'center', textColor: [160, 160, 160] } },
           { content: '' },
           { content: '' },
           { content: '' },
-          { content: '(P) (I) (K) (X) (T) (VK) (TM)', styles: { halign: 'center', fontSize: 7, textColor: [160, 160, 160] } },
+          { content: '( )P ( )I ( )K ( )X ( )T ( )VK ( )TM', styles: { halign: 'center', fontSize: 7, textColor: [160, 160, 160] } },
           { content: '' },
-          { content: '(A) (M) (D)', styles: { halign: 'center', fontSize: 7, textColor: [160, 160, 160] } },
-          { content: '(1) (2) (3)', styles: { halign: 'center', textColor: [160, 160, 160] } },
+          { content: '( )A ( )M ( )D', styles: { halign: 'center', fontSize: 7, textColor: [160, 160, 160] } },
+          { content: '( )1  ( )2  ( )3', styles: { halign: 'center', textColor: [160, 160, 160] } },
         ]);
         tableBody.push([
           { content: 'Observações: ', colSpan: 10, styles: { fontSize: 7.5, textColor: [180, 180, 180] } },
@@ -210,7 +210,7 @@ export function generateViCaPdf({ session, records }: GeneratePdfOptions): jsPDF
     doc.text(legend1, 14, finalY);
 
     doc.setFont('helvetica', 'bold');
-    doc.text(`Assinatura Vet: ${session.vet_name || 'Dr. Daniel Sanches'} (${session.vet_crmv || 'CRMV-SP'}) ________________________`, 14, finalY + 5);
+    doc.text(`Assinatura Vet: ${session.vet_name || 'Dr. Daniel Sanches Rodriguez'} (${session.vet_crmv || 'CRMV-SP 28792'}) ________________________`, 14, finalY + 5);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
@@ -230,35 +230,19 @@ export async function shareViCaPdfViaWhatsApp(session: DailySession, records: An
   if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({
+        title: `Ficha de Castração - ${session.session_date}`,
+        text: `Ficha Anestésica do Centro Cirúrgico Adote Vi.Ca - Data: ${session.session_date}`,
         files: [file],
-        title: `Ficha Anestésica Adote Vi.Ca - ${session.session_date}`,
-        text: `Ficha de controle de castração do Centro Cirúrgico Adote Vi.Ca (${session.session_date}) - Dr. Daniel Sanches. Total: ${records.length} animais.`,
       });
-      return { success: true, method: 'share' };
+      return { success: true, method: 'share' as const };
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        console.warn('Erro no navigator.share:', err);
+        console.error('Erro ao compartilhar via WhatsApp:', err);
       }
     }
   }
 
-  // Fallback: Download file directly and open WhatsApp Web/App
-  const fileUrl = URL.createObjectURL(pdfBlob);
-  const downloadLink = document.createElement('a');
-  downloadLink.href = fileUrl;
-  downloadLink.download = filename;
-  document.body.appendChild(downloadLink);
-  downloadLink.click();
-  document.body.removeChild(downloadLink);
-
-  const whatsappMessage = encodeURIComponent(
-    `📋 *Centro Cirúrgico Adote Vi.Ca - Ficha Anestésica*\n` +
-    `📅 Data: ${session.session_date}\n` +
-    `👨‍⚕️ Veterinário: ${session.vet_name}\n` +
-    `🐾 Total de animais operados: ${records.length}\n` +
-    `📄 O PDF (${filename}) foi baixado no seu dispositivo para envio neste chat.`
-  );
-
-  window.open(`https://api.whatsapp.com/send?text=${whatsappMessage}`, '_blank');
-  return { success: true, method: 'download_and_whatsapp' };
+  // Fallback: download direto do arquivo PDF
+  doc.save(filename);
+  return { success: true, method: 'download' as const };
 }

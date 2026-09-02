@@ -251,7 +251,16 @@ export const storage = {
     allRecords.push(newRecord);
     storage.saveRecords(allRecords);
 
-    // Tenta sincronizar com Supabase se configurado
+    // Sincroniza em background com o PostgreSQL da VPS dedicada
+    if (typeof window !== 'undefined') {
+      fetch('/api/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecord),
+      }).catch(err => console.warn('Sync POST /api/records offline fallback:', err));
+    }
+
+    // Fallback Supabase se configurado
     if (isSupabaseConfigured() && supabase) {
       supabase.from('anesthesia_records').insert([newRecord]).then();
     }
@@ -265,6 +274,15 @@ export const storage = {
     if (index !== -1) {
       allRecords[index] = { ...updated, updated_at: new Date().toISOString() };
       storage.saveRecords(allRecords);
+
+      // Sincroniza em background com o PostgreSQL da VPS dedicada
+      if (typeof window !== 'undefined') {
+        fetch('/api/records', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(allRecords[index]),
+        }).catch(err => console.warn('Sync PUT /api/records offline fallback:', err));
+      }
 
       if (isSupabaseConfigured() && supabase) {
         supabase.from('anesthesia_records').update(allRecords[index]).eq('id', updated.id).then();
@@ -289,6 +307,13 @@ export const storage = {
 
     storage.saveRecords(reindexed);
 
+    // Sincroniza exclusão no PostgreSQL da VPS dedicada
+    if (typeof window !== 'undefined') {
+      fetch(`/api/records?id=${id}`, {
+        method: 'DELETE',
+      }).catch(err => console.warn('Sync DELETE /api/records offline fallback:', err));
+    }
+
     if (isSupabaseConfigured() && supabase) {
       supabase.from('anesthesia_records').delete().eq('id', id).then();
     }
@@ -304,6 +329,15 @@ export const storage = {
     sessions.unshift(newSession);
     storage.saveSessions(sessions);
     storage.setActiveSessionId(newSession.id);
+
+    // Sincroniza criação de sessão no PostgreSQL da VPS dedicada
+    if (typeof window !== 'undefined') {
+      fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSession),
+      }).catch(err => console.warn('Sync POST /api/sessions offline fallback:', err));
+    }
 
     if (isSupabaseConfigured() && supabase) {
       supabase.from('daily_sessions').insert([newSession]).then();
